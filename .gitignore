@@ -1,0 +1,12 @@
+# Файлы настроек и скрипты
+notes.json
+settings.json
+*.bat
+*.py
+#editor_full.html
+
+# Временные файлы
+*.tmp
+*.log
+__pycache__/
+*.pyc
