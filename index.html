@@ -4,17 +4,26 @@
   <meta charset="UTF-8">
   <title>🎧 Аудиоархив</title>
   <style>
-    body { font-family: 'Segoe UI', sans-serif; max-width: 900px; margin: 20px auto; background: #fafafa; }
-    #controls { background: #f0f7ff; padding: 16px; border-radius: 8px; margin-bottom: 20px; }
+    body { font-family: 'Segoe UI', sans-serif; max-width: 1000px; margin: 20px auto; background: #fafafa; }
+    .container { display: flex; gap: 20px; }
+    .sidebar { width: 250px; background: #f0f7ff; padding: 15px; border-radius: 8px; }
+    .main { flex: 1; }
+    .audio-item { 
+      padding: 8px 12px; margin: 4px 0; 
+      background: white; border-radius: 4px; cursor: pointer;
+      transition: all 0.2s;
+    }
+    .audio-item:hover { background: #e3f2fd; }
+    .audio-item.active { background: #bbdefb; font-weight: bold; }
     .segment { 
       padding: 12px 16px; margin: 8px 0; 
       background: white; border-left: 4px solid #4a90e2; border-radius: 4px;
-      cursor: pointer; transition: all 0.2s;
+      cursor: pointer;
     }
-    .segment:hover { background: #f8fcff; transform: translateX(2px); }
+    .segment:hover { background: #f8fcff; }
     .segment.active { background: #e6f2ff; border-left-color: #e74c3c; }
-    .timestamp { font-family: monospace; font-weight: bold; color: #2c3e50; margin-right: 10px; }
-    #status { margin-top: 10px; padding: 6px; border-radius: 4px; }
+    .timestamp { font-family: monospace; font-weight: bold; color: #2c3e50; margin-right: 8px; }
+    #status { margin: 10px 0; padding: 8px; border-radius: 4px; font-size: 0.9em; }
     .success { background: #e8f5e9; color: #2e7d32; }
     .warn { background: #fff8e1; color: #5d4037; }
     .error { background: #ffebee; color: #c62828; }
@@ -22,70 +31,127 @@
 </head>
 <body>
   <h1>🎧 Аудиоархив</h1>
-
-  <div id="controls">
-    <p><strong>📁 1. Выберите аудио</strong></p>
-    <input type="file" id="audioInput" accept="audio/*"><br><br>
-    
-    <p><strong>📄 2. Выберите транскрипт</strong> (.txt, .md)</p>
-    <input type="file" id="transcriptInput" accept=".txt,.md">
-    
-    <div id="status" class="warn">Загрузите аудио и транскрипт</div>
+  
+  <div class="container">
+    <div class="sidebar">
+      <h3>🔊 Аудиозаписи</h3>
+      <div id="audioList">
+        <p class="warn">Загрузка списка...</p>
+      </div>
+    </div>
+    <div class="main">
+      <div id="player"></div>
+      <div id="status" class="warn">Выберите запись</div>
+      <div id="transcript"></div>
+    </div>
   </div>
 
-  <div id="transcript"></div>
-
   <script>
+    const AUDIO_DIR = 'audio/';
+    const TRANSCRIPT_DIR = 'transcripts/';
     let audio = null;
     let segments = [];
+    let currentAudio = null;
 
-    // === Аудио ===
-    document.getElementById('audioInput').addEventListener('change', async (e) => {
-      const file = e.target.files[0];
-      if (!file) return;
+    // === 1. Получаем список аудиофайлов ===
+    async function loadAudioList() {
+      try {
+        // GitHub Pages не поддерживает directory listing → 
+        // поэтому **вручную задаём список** (пока)
+        // Позже можно генерировать через скрипт или использовать API-файл
+        
+        const knownFiles = [
+          'ponimaete_etapy.mp3',
+          'beseda_o_molitve.mp3',
+          // добавьте свои
+        ];
+
+        const listEl = document.getElementById('audioList');
+        if (knownFiles.length === 0) {
+          listEl.innerHTML = '<p class="warn">Нет аудиофайлов</p>';
+          return;
+        }
+
+        listEl.innerHTML = knownFiles.map(file => 
+          `<div class="audio-item" onclick="loadRecording('${file}')">
+            🎧 ${file.replace(/\.mp3$/, '').replace(/_/g, ' ')}
+          </div>`
+        ).join('');
+      } catch (err) {
+        document.getElementById('audioList').innerHTML = `<p class="error">❌ ${err.message}</p>`;
+      }
+    }
+
+    // === 2. Загрузка записи по имени ===
+    async function loadRecording(audioFilename) {
+      const baseName = audioFilename.replace(/\.(mp3|wav|ogg)$/i, '');
+      const audioUrl = `${AUDIO_DIR}${audioFilename}`;
+      let transcriptText = null;
+      let transcriptExt = null;
+
+      setStatus(`⏳ Загрузка: ${baseName}...`, 'warn');
+
+      // Снимаем активность
+      document.querySelectorAll('.audio-item').forEach(el => el.classList.remove('active'));
+      event?.currentTarget?.classList.add('active');
 
       try {
-        const url = URL.createObjectURL(file);
+        // Загружаем аудио
+        const audioBlob = await fetch(audioUrl).then(r => {
+          if (!r.ok) throw new Error(`Аудио не найдено: ${r.status}`);
+          return r.blob();
+        });
+        const audioObjectUrl = URL.createObjectURL(audioBlob);
+
         if (!audio) {
           audio = new Audio();
           audio.controls = true;
           audio.style.width = '100%';
-          audio.style.marginTop = '12px';
-          document.getElementById('controls').appendChild(audio);
         }
-        audio.src = url;
-        setStatus(`✅ Аудио: ${file.name}`, 'success');
-        checkReady();
+        audio.src = audioObjectUrl;
+        document.getElementById('player').innerHTML = '';
+        document.getElementById('player').appendChild(audio);
+        currentAudio = baseName;
+
+        // Пробуем транскрипты: .md, .txt
+        for (const ext of ['.md', '.txt']) {
+          try {
+            const url = `${TRANSCRIPT_DIR}${baseName}${ext}`;
+            const response = await fetch(url);
+            if (response.ok) {
+              transcriptText = await response.text();
+              transcriptExt = ext;
+              break;
+            }
+          } catch (e) {
+            // игнорируем
+          }
+        }
+
+        if (transcriptText) {
+          segments = parseTranscript(transcriptText);
+          renderTranscript();
+          setStatus(`✅ ${baseName} — ${segments.length} сегментов (${transcriptExt})`, 'success');
+        } else {
+          segments = [];
+          renderTranscript();
+          setStatus(`⚠️ Аудио загружено, транскрипт не найден`, 'warn');
+        }
+
       } catch (err) {
-        setStatus(`❌ Аудио: ${err.message}`, 'error');
+        setStatus(`❌ Ошибка: ${err.message}`, 'error');
+        console.error(err);
       }
-    });
+    }
 
-    // === Транскрипт ===
-    document.getElementById('transcriptInput').addEventListener('change', (e) => {
-      const file = e.target.files[0];
-      if (!file) return;
-
-      const reader = new FileReader();
-      reader.onload = (e) => {
-        const text = e.target.result;
-        segments = parseTranscript(text);
-        render();
-        setStatus(`✅ Транскрипт: ${segments.length} сегментов (${file.name})`, 'success');
-        checkReady();
-      };
-      reader.readAsText(file);
-    });
-
-    // === Парсер под ваш формат: ### [00:00:00] Заголовок + текст ===
+    // === 3. Парсер под ваш формат ===
     function parseTranscript(text) {
-      // Пропускаем мета-блок (если есть)
-      const lines = text.split('\n');
-      const startIndex = lines.findIndex(line => line.trim().startsWith('### ['));
-      const content = lines.slice(startIndex === -1 ? 0 : startIndex).join('\n');
+      // Убираем мета-блок
+      const startIndex = text.indexOf('### [');
+      if (startIndex !== -1) text = text.slice(startIndex);
 
-      const segmentsRaw = content.split(/^(?=### \[)/m).filter(Boolean);
-      return segmentsRaw.map((seg, i, arr) => {
+      const rawSegments = text.split(/^(?=### \[)/m).filter(Boolean);
+      return rawSegments.map((seg, i, arr) => {
         const headerMatch = seg.match(/^### \[(\d{1,2}):(\d{2}):(\d{2})\]\s*(.*)/);
         if (!headerMatch) return null;
 
@@ -93,67 +159,55 @@
         const m = parseInt(headerMatch[2]) || 0;
         const s = parseInt(headerMatch[3]) || 0;
         const title = headerMatch[4] || '';
-        const text = seg.split('\n').slice(1).join('\n').trim();
+        const textLines = seg.split('\n').slice(1).filter(l => l.trim());
+        const text = textLines.join('\n').trim();
 
         const start = h * 3600 + m * 60 + s;
-        const end = (i < arr.length - 1)
-          ? (() => {
-              const nextMatch = arr[i + 1].match(/^### \[(\d{1,2}):(\d{2}):(\d{2})\]/);
-              if (nextMatch) {
-                const nh = parseInt(nextMatch[1]) || 0;
-                const nm = parseInt(nextMatch[2]) || 0;
-                const ns = parseInt(nextMatch[3]) || 0;
-                return nh * 3600 + nm * 60 + ns;
-              }
-              return start + 60;
-            })()
+        const nextMatch = (i < arr.length - 1) 
+          ? arr[i + 1].match(/^### \[(\d{1,2}):(\d{2}):(\d{2})\]/) 
+          : null;
+        const end = nextMatch 
+          ? (parseInt(nextMatch[1] || 0) * 3600 + parseInt(nextMatch[2] || 0) * 60 + parseInt(nextMatch[3] || 0))
           : start + 60;
 
         return { start, end, title, text };
       }).filter(Boolean);
     }
 
-    // === Воспроизведение ===
+    // === 4. Воспроизведение ===
     function playSegment(i) {
       const seg = segments[i];
       if (!seg || !audio) return;
 
-      // Активация
       document.querySelectorAll('.segment').forEach(el => el.classList.remove('active'));
       const el = document.querySelectorAll('.segment')[i];
       el?.classList.add('active');
 
       audio.currentTime = seg.start;
-      audio.play().catch(err => {
-        console.warn('Воспроизведение заблокировано:', err);
-        // Без всплывающих окон — пользователь сам кликнет по плееру при необходимости
-      });
-
+      audio.play().catch(e => console.warn('Воспроизведение заблокировано:', e));
       el?.scrollIntoView({ behavior: 'smooth', block: 'center' });
     }
 
-    // === Отображение ===
-    function render() {
-      const container = document.getElementById('transcript');
-      if (!segments.length) {
-        container.innerHTML = '<p><i>Транскрипция не содержит сегментов</i></p>';
-        return;
-      }
-
-      container.innerHTML = segments.map((seg, i) =>
-        `<div class="segment" onclick="playSegment(${i})">
-          <div><span class="timestamp">[${formatTime(seg.start)}]</span> <strong>${seg.title}</strong></div>
-          ${seg.text ? `<div style="margin-top:6px; font-size:0.95em;">${seg.text.replace(/\n/g, '<br>')}</div>` : ''}
-        </div>`
-      ).join('');
+    // === 5. Отображение ===
+    function renderTranscript() {
+      const el = document.getElementById('transcript');
+      el.innerHTML = segments.length 
+        ? segments.map((seg, i) =>
+            `<div class="segment" onclick="playSegment(${i})">
+              <div><span class="timestamp">[${formatTime(seg.start)}]</span> <strong>${seg.title}</strong></div>
+              ${seg.text ? `<div style="margin-top:6px;font-size:0.95em;">${seg.text.replace(/\n/g, '<br>')}</div>` : ''}
+            </div>`
+          ).join('')
+        : '<p><i>Транскрипция отсутствует</i></p>';
     }
 
     function formatTime(s) {
       s = Math.floor(s);
-      const h = Math.floor(s / 3600);
-      const m = Math.floor((s % 3600) / 60);
-      const ss = s % 60;
-      return `${h.toString().padStart(2, '0')}:${m.toString().padStart(2, '0')}:${ss.toString().padStart(2, '0')}`;
+      return [
+        Math.floor(s / 3600),
+        Math.floor((s % 3600) / 60),
+        s % 60
+      ].map(n => n.toString().padStart(2, '0')).join(':');
     }
 
     function setStatus(html, cls) {
@@ -162,13 +216,11 @@
       el.innerHTML = html;
     }
 
-    function checkReady() {
-      if (audio && segments.length > 0) {
-        setStatus('✅ Готово — кликайте по таймкодам!', 'success');
-      }
-    }
-
     window.playSegment = playSegment;
+    window.loadRecording = loadRecording;
+
+    // Запуск
+    document.addEventListener('DOMContentLoaded', loadAudioList);
   </script>
 </body>
 </html>

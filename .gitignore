@@ -3,8 +3,7 @@ notes.json
 settings.json
 *.bat
 *.py
-#editor_full.html
-
+*.html_n
 # Временные файлы
 *.tmp
 *.log
