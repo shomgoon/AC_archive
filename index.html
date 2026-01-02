@@ -1,393 +1,44 @@
-<!DOCTYPE html>
-<html lang="ru">
-
-<head>
-  <meta charset="UTF-8">
-  <title>🎧 Аудиоархив</title>
-  <style>
-    body {
-      font-family: 'Segoe UI', sans-serif;
-      max-width: 1000px;
-      margin: 20px auto;
-      background: #fafafa;
-    }
-
-    .container {
-      display: flex;
-      gap: 20px;
-    }
-
-    .sidebar {
-      width: 250px;
-      background: #f0f7ff;
-      padding: 15px;
-      border-radius: 8px;
-    }
-
-    .main {
-      flex: 1;
-    }
-
-    .audio-item {
-      padding: 8px 12px;
-      margin: 4px 0;
-      background: white;
-      border-radius: 4px;
-      cursor: pointer;
-      transition: all 0.2s;
-    }
-
-    .audio-item:hover {
-      background: #e3f2fd;
-    }
-
-    .audio-item.active {
-      background: #bbdefb;
-      font-weight: bold;
-    }
-
-    .segment {
-      padding: 12px 16px;
-      margin: 8px 0;
-      background: white;
-      border-left: 4px solid #4a90e2;
-      border-radius: 4px;
-      cursor: pointer;
-    }
-
-    .segment:hover {
-      background: #f8fcff;
-    }
-
-    .segment.active {
-      background: #e6f2ff;
-      border-left-color: #e74c3c;
-    }
-
-    .timestamp {
-      font-family: monospace;
-      font-weight: bold;
-      color: #2c3e50;
-      margin-right: 8px;
-    }
-
-    #status {
-      margin: 10px 0;
-      padding: 8px;
-      border-radius: 4px;
-      font-size: 0.9em;
-    }
-
-    .success {
-      background: #e8f5e9;
-      color: #2e7d32;
-    }
-
-    .warn {
-      background: #fff8e1;
-      color: #5d4037;
-    }
-
-    .error {
-      background: #ffebee;
-      color: #c62828;
-    }
-  </style>
-</head>
-
-<body>
-  <h1>🎧 Аудиоархив</h1>
-
-  <div class="container">
-    <div class="sidebar">
-      <h3>🔊 Аудиозаписи</h3>
-      <div id="audioList">
-        <p class="warn">Загрузка списка...</p>
-      </div>
+// Функция для показа прогресса загрузки
+function showProgress(filename, loaded, total) {
+  const statusEl = document.getElementById('status');
+  const percent = total ? Math.round((loaded / total) * 100) : 0;
+  
+  statusEl.innerHTML = `
+    <div>⏳ Загрузка: ${filename}</div>
+    <div class="progress-container">
+      <div class="progress-bar" style="width: ${percent}%"></div>
     </div>
-    <div class="main">
-      <div id="player"></div>
-      <div id="status" class="warn">Выберите запись</div>
-      <div id="transcript"></div>
-    </div>
-  </div>
+    <div>${loaded} / ${total} байт (${percent}%)</div>
+  `;
+}
 
-  <script>
-    const AUDIO_DIR = 'audio/';
-    const TRANSCRIPT_DIR = 'transcripts/';
-    let audio = null;
-    let segments = [];
-    let currentAudio = null;
-
-    // === 1. Получаем список аудиофайлов ===
-    async function loadAudioList() {
-      try {
-        const knownFiles = [
-          'и_понимаете_и_этому_всему_свои_этапы.mp3',
-          'он_пишет_дух_человека.mp3',
-          'подожди_батюшка_дай_я_включу.mp3'
-        ];
-
-        const listEl = document.getElementById('audioList');
-        if (knownFiles.length === 0) {
-          listEl.innerHTML = '<p class="warn">Нет аудиофайлов</p>';
-          return;
-        }
-
-        listEl.innerHTML = knownFiles.map(file =>
-          `<div class="audio-item" data-filename="${file}" onclick="loadRecording('${file}')">
-              🎧 ${file.replace(/\.mp3$/, '').replace(/_/g, ' ')}
-            </div>`
-        ).join('');
-
-      } catch (err) {
-        console.error('Ошибка загрузки списка аудио:', err);
-        document.getElementById('audioList').innerHTML = `<p class="error">❌ ${err.message}</p>`;
-      }
-    }
-
-    // === 2. Загрузка записи по имени ===
-    async function loadRecording(audioFilename) {
-      const baseName = audioFilename.replace(/\.(mp3|wav|ogg)$/i, '');
-      const audioUrl = `${AUDIO_DIR}${audioFilename}`;
-      let transcriptText = null;
-      let transcriptExt = null;
-
-      setStatus(`⏳ Загрузка: ${baseName}...`, 'warn');
-
-      // Снимаем активность
-      document.querySelectorAll('.audio-item').forEach(el => el.classList.remove('active'));
-      
-      // Находим элемент по data-filename
-      const activeItem = document.querySelector(`.audio-item[data-filename="${audioFilename}"]`);
-      if (activeItem) {
-        activeItem.classList.add('active');
-      }
-
-      try {
-        // Загружаем аудио
-        const audioBlob = await fetch(audioUrl).then(r => {
-          if (!r.ok) throw new Error(`Аудио не найдено: ${r.status} ${r.statusText}`);
-          return r.blob();
+// Модифицируйте загрузку аудио
+const audioBlob = await fetch(audioUrl).then(r => {
+  if (!r.ok) throw new Error(`Аудио не найдено: ${r.status} ${r.statusText}`);
+  
+  const reader = r.body.getReader();
+  const contentLength = +r.headers.get('Content-Length');
+  let receivedLength = 0;
+  const chunks = [];
+  
+  return new ReadableStream({
+    start(controller) {
+      function pump() {
+        return reader.read().then(({ done, value }) => {
+          if (done) {
+            controller.close();
+            return new Blob(chunks);
+          }
+          
+          chunks.push(value);
+          receivedLength += value.length;
+          showProgress(filename, receivedLength, contentLength);
+          
+          controller.enqueue(value);
+          return pump();
         });
-        const audioObjectUrl = URL.createObjectURL(audioBlob);
-
-        if (!audio) {
-          audio = new Audio();
-          audio.controls = true;
-          audio.style.width = '100%';
-        }
-        audio.src = audioObjectUrl;
-        document.getElementById('player').innerHTML = '';
-        document.getElementById('player').appendChild(audio);
-        currentAudio = baseName;
-
-        // Пробуем транскрипты: .md, .txt
-        for (const ext of ['.md', '.txt']) {
-          try {
-            const url = `${TRANSCRIPT_DIR}${baseName}${ext}`;
-            console.log('Пробую загрузить транскрипт по адресу:', url);
-            const response = await fetch(url);
-            if (response.ok) {
-              transcriptText = await response.text();
-              transcriptExt = ext;
-              console.log('Транскрипт загружен, длина:', transcriptText.length);
-              break;
-            }
-          } catch (e) {
-            console.log('Не удалось загрузить', ext, e.message);
-          }
-        }
-
-        if (transcriptText) {
-          segments = parseTranscript(transcriptText);
-          renderTranscript();
-          setStatus(`✅ ${baseName} — ${segments.length} сегментов (${transcriptExt})`, 'success');
-        } else {
-          // Попробуем найти файл с оригинальным названием (без замены подчеркиваний)
-          const alternativeNames = [
-            baseName,
-            baseName.replace(/_/g, ' '),
-            audioFilename.replace(/\.(mp3|wav|ogg)$/i, '')
-          ];
-          
-          for (const name of alternativeNames) {
-            for (const ext of ['.md', '.txt']) {
-              try {
-                const url = `${TRANSCRIPT_DIR}${name}${ext}`;
-                console.log('Пробую альтернативное имя:', url);
-                const response = await fetch(url);
-                if (response.ok) {
-                  transcriptText = await response.text();
-                  transcriptExt = ext;
-                  console.log('Транскрипт найден по альтернативному имени');
-                  break;
-                }
-              } catch (e) {
-                // игнорируем
-              }
-            }
-            if (transcriptText) break;
-          }
-          
-          if (transcriptText) {
-            segments = parseTranscript(transcriptText);
-            renderTranscript();
-            setStatus(`✅ ${baseName} — ${segments.length} сегментов (${transcriptExt})`, 'success');
-          } else {
-            segments = [];
-            renderTranscript();
-            setStatus(`⚠️ Аудио загружено, транскрипт не найден`, 'warn');
-          }
-        }
-
-      } catch (err) {
-        setStatus(`❌ Ошибка: ${err.message}`, 'error');
-        console.error('Ошибка загрузки записи:', err);
       }
+      return pump();
     }
-
-    // === 3. Парсер под ваш формат ===
-    function parseTranscript(text) {
-      // Убираем мета-блок
-      const startIndex = text.indexOf('### [');
-      if (startIndex !== -1) text = text.slice(startIndex);
-
-      const rawSegments = text.split(/^(?=### \[)/m).filter(Boolean);
-      return rawSegments.map((seg, i, arr) => {
-        const headerMatch = seg.match(/^### \[(\d{1,2}):(\d{2}):(\d{2})\]\s*(.*)/);
-        if (!headerMatch) return null;
-
-        const h = parseInt(headerMatch[1]) || 0;
-        const m = parseInt(headerMatch[2]) || 0;
-        const s = parseInt(headerMatch[3]) || 0;
-        const title = headerMatch[4] || '';
-        const textLines = seg.split('\n').slice(1).filter(l => l.trim());
-        const text = textLines.join('\n').trim();
-
-        const start = h * 3600 + m * 60 + s;
-        const nextMatch = (i < arr.length - 1)
-          ? arr[i + 1].match(/^### \[(\d{1,2}):(\d{2}):(\d{2})\]/)
-          : null;
-        const end = nextMatch
-          ? (parseInt(nextMatch[1] || 0) * 3600 + parseInt(nextMatch[2] || 0) * 60 + parseInt(nextMatch[3] || 0))
-          : start + 60;
-
-        return { start, end, title, text };
-      }).filter(Boolean);
-    }
-
-    // === 4. Воспроизведение ===
-    function playSegment(i) {
-      const seg = segments[i];
-      if (!seg || !audio) return;
-
-      document.querySelectorAll('.segment').forEach(el => el.classList.remove('active'));
-      const el = document.querySelectorAll('.segment')[i];
-      el?.classList.add('active');
-
-      audio.currentTime = seg.start;
-      audio.play().catch(e => console.warn('Воспроизведение заблокировано:', e));
-      el?.scrollIntoView({ behavior: 'smooth', block: 'center' });
-    }
-
-    // === 5. Отображение ===
-    function renderTranscript() {
-      const el = document.getElementById('transcript');
-      if (segments.length) {
-        el.innerHTML = segments.map((seg, i) =>
-          `<div class="segment" onclick="playSegment(${i})">
-              <div><span class="timestamp">[${formatTime(seg.start)}]</span> <strong>${seg.title}</strong></div>
-              ${seg.text ? `<div style="margin-top:6px;font-size:0.95em;">${seg.text.replace(/\n/g, '<br>')}</div>` : ''}
-            </div>`
-        ).join('');
-      } else {
-        el.innerHTML = '<p><i>Транскрипция отсутствует</i></p>';
-      }
-    }
-
-    function formatTime(s) {
-      s = Math.floor(s);
-      return [
-        Math.floor(s / 3600),
-        Math.floor((s % 3600) / 60),
-        s % 60
-      ].map(n => n.toString().padStart(2, '0')).join(':');
-    }
-
-    function setStatus(html, cls) {
-      const el = document.getElementById('status');
-      el.className = cls;
-      el.innerHTML = html;
-    }
-
-    // === 6. Автоматический поиск файлов ===
-    async function discoverAudioFiles() {
-      try {
-        // Сначала пробуем загрузить список из файла
-        const response = await fetch('files.txt');
-        if (response.ok) {
-          const text = await response.text();
-          const files = text.split('\n')
-            .filter(line => line.trim() && (line.includes('.mp3') || line.includes('.wav') || line.includes('.ogg')))
-            .map(line => line.trim());
-          
-          if (files.length > 0) {
-            return files;
-          }
-        }
-      } catch (e) {
-        console.log('Не удалось загрузить files.txt:', e.message);
-      }
-      
-      // Если files.txt нет или он пуст, используем статический список
-      return [
-        'и_понимаете_и_этому_всему_свои_этапы.mp3',
-        'он_пишет_дух_человека.mp3',
-        'подожди_батюшка_дай_я_включу.mp3'
-      ];
-    }
-
-    // === 7. Улучшенная загрузка списка ===
-    async function loadAudioListEnhanced() {
-      const listEl = document.getElementById('audioList');
-      listEl.innerHTML = '<p class="warn">⏳ Поиск аудиозаписей...</p>';
-      
-      try {
-        const audioFiles = await discoverAudioFiles();
-        
-        if (audioFiles.length === 0) {
-          listEl.innerHTML = '<p class="warn">Нет аудиофайлов</p>';
-          return;
-        }
-        
-        listEl.innerHTML = audioFiles.map(file => {
-          const displayName = file.replace(/\.(mp3|wav|ogg)$/i, '').replace(/_/g, ' ');
-          return `<div class="audio-item" data-filename="${file}" onclick="loadRecording('${file}')">
-                    🎧 ${displayName}
-                  </div>`;
-        }).join('');
-        
-        setStatus(`✅ Найдено ${audioFiles.length} аудиозаписей`, 'success');
-        
-      } catch (err) {
-        console.error('Ошибка загрузки списка аудио:', err);
-        listEl.innerHTML = `<p class="error">❌ ${err.message}</p>`;
-        setStatus(`❌ Ошибка загрузки списка: ${err.message}`, 'error');
-      }
-    }
-
-    // Экспортируем функции в глобальную область видимости
-    window.playSegment = playSegment;
-    window.loadRecording = loadRecording;
-    window.loadAudioList = loadAudioListEnhanced;
-
-    // Запуск при загрузке страницы
-    document.addEventListener('DOMContentLoaded', () => {
-      console.log('✅ DOM загружен — запускаем загрузку аудиозаписей');
-      loadAudioListEnhanced();
-    });
-  </script>
-</body>
-
-</html>
+  }).then(stream => new Response(stream)).then(response => response.blob());
+});
