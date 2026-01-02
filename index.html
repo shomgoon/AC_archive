@@ -1,587 +1,945 @@
 <!DOCTYPE html>
 <html lang="ru">
+  <head>
+    <meta charset="UTF-8" />
+    <title>🎧 Аудиоархив</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 
-<head>
-  <meta charset="UTF-8">
-  <title>🎧 Аудиоархив</title>
-  <style>
-    /* === ВСЕ СТИЛИ В ОДНОМ МЕСТЕ === */
-    body {
-      font-family: 'Segoe UI', sans-serif;
-      max-width: 1000px;
-      margin: 20px auto;
-      background: #fafafa;
-    }
+    <style>
+      /* === MOBILE FIRST: Начинаем с мобильных стилей === */
 
-    .container {
-      display: flex;
-      gap: 20px;
-    }
+      /* 1. БАЗОВЫЕ СТИЛИ для всех устройств */
+      * {
+        box-sizing: border-box; /* Чтобы padding не ломал ширину */
+      }
 
-    .sidebar {
-      width: 250px;
-      background: #f0f7ff;
-      padding: 15px;
-      border-radius: 8px;
-    }
+      body {
+        font-family: "Segoe UI", system-ui, sans-serif;
+        margin: 0;
+        padding: 15px;
+        background: #fafafa;
+        color: #333;
+        line-height: 1.5;
+        font-size: 16px;
+      }
 
-    .main {
-      flex: 1;
-    }
+      h1 {
+        margin: 0 0 20px 0;
+        font-size: 24px;
+        color: #2c3e50;
+      }
 
-    .audio-item {
-      padding: 8px 12px;
-      margin: 4px 0;
-      background: white;
-      border-radius: 4px;
-      cursor: pointer;
-      transition: all 0.2s;
-    }
+      h3 {
+        margin: 0 0 15px 0;
+        font-size: 18px;
+        color: #34495e;
+      }
 
-    .audio-item:hover {
-      background: #e3f2fd;
-    }
+      /* 2. ПОИСК (для всех устройств) */
+      .search-container {
+        position: relative;
+        margin: 0 0 20px 0;
+      }
 
-    .audio-item.active {
-      background: #bbdefb;
-      font-weight: bold;
-    }
+      #searchInput {
+        width: 100%;
+        padding: 12px 40px 12px 15px;
+        border: 2px solid #ddd;
+        border-radius: 8px;
+        font-size: 16px;
+        transition: border-color 0.3s;
+      }
 
-    .segment {
-      padding: 12px 16px;
-      margin: 8px 0;
-      background: white;
-      border-left: 4px solid #4a90e2;
-      border-radius: 4px;
-      cursor: pointer;
-    }
+      #searchInput:focus {
+        outline: none;
+        border-color: #4a90e2;
+      }
 
-    .segment:hover {
-      background: #f8fcff;
-    }
+      .clear-search {
+        position: absolute;
+        right: 15px;
+        top: 50%;
+        transform: translateY(-50%);
+        background: none;
+        border: none;
+        font-size: 20px;
+        cursor: pointer;
+        color: #999;
+        padding: 0;
+        width: 24px;
+        height: 24px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+      }
 
-    .segment.active {
-      background: #e6f2ff;
-      border-left-color: #e74c3c;
-    }
+      /* 3. КНОПКА МОБИЛЬНОГО МЕНЮ */
+      .mobile-menu-toggle {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        width: 100%;
+        background: #4a90e2;
+        color: white;
+        border: none;
+        padding: 14px;
+        border-radius: 8px;
+        font-size: 16px;
+        font-weight: 500;
+        cursor: pointer;
+        margin-bottom: 15px;
+        transition: background-color 0.3s;
+      }
 
-    .timestamp {
-      font-family: monospace;
-      font-weight: bold;
-      color: #2c3e50;
-      margin-right: 8px;
-    }
+      .mobile-menu-toggle:hover {
+        background: #357abd;
+      }
 
-    #status {
-      margin: 10px 0;
-      padding: 8px;
-      border-radius: 4px;
-      font-size: 0.9em;
-    }
+      .mobile-menu-toggle span {
+        margin-right: 10px;
+        font-size: 18px;
+      }
 
-    .success {
-      background: #e8f5e9;
-      color: #2e7d32;
-    }
+      /* 4. ОСНОВНОЙ КОНТЕЙНЕР (вертикальный на мобильных) */
+      .container {
+        display: flex;
+        flex-direction: column;
+        gap: 20px;
+      }
 
-    .warn {
-      background: #fff8e1;
-      color: #5d4037;
-    }
+      /* 5. БОКОВАЯ ПАНЕЛЬ (скрыта на мобильных по умолчанию) */
+      .sidebar {
+        width: 100%;
+        background: #f0f7ff;
+        padding: 20px;
+        border-radius: 12px;
+        display: none; /* Скрываем на мобильных */
+      }
 
-    .error {
-      background: #ffebee;
-      color: #c62828;
-    }
+      .sidebar.visible {
+        display: block; /* Показываем при активации */
+      }
 
-    /* Стили для поиска */
-    .search-container {
-      position: relative;
-      margin: 15px 0;
-    }
+      /* 6. ОСНОВНАЯ ОБЛАСТЬ */
+      .main {
+        width: 100%;
+      }
 
-    #searchInput {
-      width: 100%;
-      padding: 8px 30px 8px 10px;
-      border: 1px solid #ddd;
-      border-radius: 4px;
-      font-size: 16px;
-    }
+      /* 7. ЭЛЕМЕНТЫ СПИСКА АУДИО */
+      .audio-item {
+        padding: 14px 16px;
+        margin: 8px 0;
+        background: white;
+        border-radius: 8px;
+        cursor: pointer;
+        transition: all 0.2s;
+        border: 1px solid transparent;
+        font-size: 16px;
+        min-height: 52px; /* Для удобного касания */
+        display: flex;
+        align-items: center;
+      }
 
-    .clear-search {
-      position: absolute;
-      right: 10px;
-      top: 50%;
-      transform: translateY(-50%);
-      background: none;
-      border: none;
-      font-size: 20px;
-      cursor: pointer;
-      color: #999;
-    }
+      .audio-item:hover {
+        background: #e3f2fd;
+        border-color: #bbdefb;
+      }
 
-    /* Подсветка найденного текста */
-    mark {
-      background-color: #ffeb3b;
-      padding: 0 2px;
-      border-radius: 2px;
-    }
-  </style>
-</head>
+      .audio-item.active {
+        background: #bbdefb;
+        border-color: #4a90e2;
+        font-weight: 600;
+      }
 
-<body>
-  <h1>🎧 Аудиоархив</h1>
+      /* 8. АУДИОПЛЕЕР */
+      #player {
+        margin-bottom: 20px;
+      }
 
-  <!-- Поле поиска -->
-  <div class="search-container">
-    <input type="text" id="searchInput" placeholder="🔍 Поиск по транскриптам...">
-    <button class="clear-search" title="Очистить поиск">×</button>
-  </div>
+      #player audio {
+        width: 100%;
+        border-radius: 8px;
+      }
 
-  <!-- Основной контейнер -->
-  <div class="container">
-    <!-- Левая панель со списком аудио -->
-    <div class="sidebar">
-      <h3>🔊 Аудиозаписи</h3>
-      <div id="audioList">
-        <p class="warn">Загрузка списка...</p>
+      /* 9. СТАТУС */
+      #status {
+        margin: 0 0 20px 0;
+        padding: 12px 16px;
+        border-radius: 8px;
+        font-size: 15px;
+      }
+
+      .success {
+        background: #e8f5e9;
+        color: #2e7d32;
+        border-left: 4px solid #4caf50;
+      }
+
+      .warn {
+        background: #fff8e1;
+        color: #5d4037;
+        border-left: 4px solid #ff9800;
+      }
+
+      .error {
+        background: #ffebee;
+        color: #c62828;
+        border-left: 4px solid #f44336;
+      }
+
+      /* 10. СЕГМЕНТЫ ТРАНСКРИПТА */
+      .segment {
+        padding: 16px;
+        margin: 12px 0;
+        background: white;
+        border-left: 4px solid #4a90e2;
+        border-radius: 8px;
+        cursor: pointer;
+        transition: all 0.2s;
+        min-height: 60px; /* Для удобного касания */
+      }
+
+      .segment:hover {
+        background: #f8fcff;
+        transform: translateY(-2px);
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+      }
+
+      .segment.active {
+        background: #e6f2ff;
+        border-left-color: #e74c3c;
+      }
+
+      .timestamp {
+        font-family: "Roboto Mono", monospace, monospace;
+        font-weight: 600;
+        color: #2c3e50;
+        margin-right: 10px;
+        font-size: 14px;
+        display: inline-block;
+        margin-bottom: 5px;
+      }
+
+      /* 11. ПОДСВЕТКА ПОИСКА */
+      mark {
+        background-color: #ffeb3b;
+        padding: 0 2px;
+        border-radius: 2px;
+      }
+
+      /* 12. ИНДИКАТОР ЗАГРУЗКИ */
+      .loading-indicator {
+        display: inline-block;
+        width: 18px;
+        height: 18px;
+        border: 2px solid rgba(74, 144, 226, 0.2);
+        border-top-color: #4a90e2;
+        border-radius: 50%;
+        animation: spin 1s linear infinite;
+        margin-right: 10px;
+      }
+
+      @keyframes spin {
+        to {
+          transform: rotate(360deg);
+        }
+      }
+
+      /* 13. КНОПКИ УПРАВЛЕНИЯ КЭШЕМ */
+      .cache-controls {
+        display: flex;
+        gap: 10px;
+        margin-top: 20px;
+        justify-content: center;
+        flex-wrap: wrap;
+      }
+
+      .cache-controls button {
+        padding: 10px 16px;
+        border: none;
+        border-radius: 6px;
+        background: #f0f0f0;
+        color: #555;
+        font-size: 14px;
+        cursor: pointer;
+        transition: all 0.2s;
+      }
+
+      .cache-controls button:hover {
+        background: #e0e0e0;
+      }
+
+      /* === ДЕСКТОПНАЯ ВЕРСИЯ (от 768px) === */
+      @media (min-width: 768px) {
+        body {
+          max-width: 1200px;
+          margin: 30px auto;
+          padding: 0 30px;
+        }
+
+        h1 {
+          font-size: 32px;
+          margin-bottom: 30px;
+        }
+
+        h3 {
+          font-size: 20px;
+        }
+
+        .mobile-menu-toggle {
+          display: none; /* Скрываем на десктопе */
+        }
+
+        .container {
+          flex-direction: row; /* Горизонтальное расположение */
+          gap: 30px;
+        }
+
+        .sidebar {
+          display: block; /* Всегда показываем */
+          width: 280px;
+          flex-shrink: 0;
+        }
+
+        .main {
+          flex: 1;
+        }
+
+        .audio-item {
+          font-size: 15px;
+          min-height: 46px;
+          padding: 12px 16px;
+        }
+
+        .segment {
+          min-height: auto;
+          padding: 14px;
+        }
+      }
+
+      /* === ПЛАНШЕТЫ (от 1024px) === */
+      @media (min-width: 1024px) {
+        body {
+          max-width: 1400px;
+        }
+
+        .sidebar {
+          width: 320px;
+        }
+      }
+
+      /* === ТЕМНАЯ ТЕМА (если система в темном режиме) === */
+      @media (prefers-color-scheme: dark) {
+        body {
+          background: #121212;
+          color: #e0e0e0;
+        }
+
+        .sidebar {
+          background: #1e1e1e;
+        }
+
+        .audio-item {
+          background: #2d2d2d;
+          color: #e0e0e0;
+        }
+
+        .audio-item:hover {
+          background: #3d3d3d;
+        }
+
+        .audio-item.active {
+          background: #2c5282;
+          color: white;
+        }
+
+        .segment {
+          background: #2d2d2d;
+          color: #e0e0e0;
+        }
+
+        .segment:hover {
+          background: #3d3d3d;
+        }
+
+        #searchInput {
+          background: #2d2d2d;
+          color: #e0e0e0;
+          border-color: #444;
+        }
+
+        .cache-controls button {
+          background: #2d2d2d;
+          color: #e0e0e0;
+        }
+
+        .cache-controls button:hover {
+          background: #3d3d3d;
+        }
+      }
+
+      /* === АНИМАЦИИ И МИКРОИНТЕРАКЦИИ === */
+      .audio-item,
+      .segment,
+      button {
+        -webkit-tap-highlight-color: transparent; /* Убираем синий highlight на мобильных */
+      }
+
+      .audio-item:active,
+      .segment:active {
+        transform: scale(0.98);
+      }
+    </style>
+  </head>
+
+  <body>
+    <h1>🎧 Аудиоархив</h1>
+
+    <!-- Поле поиска -->
+    <div class="search-container">
+      <input
+        type="text"
+        id="searchInput"
+        placeholder="🔍 Поиск по транскриптам..."
+        autocomplete="off"
+      />
+      <button class="clear-search" title="Очистить поиск">×</button>
+    </div>
+
+    <!-- Кнопка мобильного меню -->
+    <button class="mobile-menu-toggle" id="mobileMenuToggle">
+      <span>☰</span> Список аудиозаписей
+    </button>
+
+    <!-- Основной контейнер -->
+    <div class="container">
+      <!-- Левая панель со списком аудио -->
+      <div class="sidebar" id="sidebar">
+        <h3>🔊 Аудиозаписи</h3>
+        <div id="audioList">
+          <p class="warn">Загрузка списка...</p>
+        </div>
+      </div>
+
+      <!-- Правая часть: плеер и транскрипт -->
+      <div class="main">
+        <div id="player"></div>
+        <div id="status" class="warn">Выберите запись из списка</div>
+        <div id="transcript"></div>
       </div>
     </div>
 
-    <!-- Правая часть: плеер и транскрипт -->
-    <div class="main">
-      <div id="player"></div>
-      <div id="status" class="warn">Выберите запись</div>
-      <div id="transcript"></div>
+    <!-- Управление кэшем -->
+    <div class="cache-controls">
+      <button onclick="showCacheInfo()">📊 Статистика кэша</button>
+      <button onclick="clearCache()">🗑️ Очистить кэш</button>
     </div>
-  </div>
 
-  <!-- === ВЕСЬ JAVASCRIPT КОД НИЖЕ === -->
-  <script>
-    // === НАСТРОЙКИ ===
-    const AUDIO_DIR = 'audio/';      // Папка с аудиофайлами
-    const TRANSCRIPT_DIR = 'transcripts/'; // Папка с транскриптами
+    <!-- === JAVASCRIPT КОД === -->
+    <script>
+      // === КОНСТАНТЫ И ПЕРЕМЕННЫЕ ===
+      const AUDIO_DIR = "audio/";
+      const TRANSCRIPT_DIR = "transcripts/";
 
-    // === ПЕРЕМЕННЫЕ ДЛЯ ХРАНЕНИЯ ДАННЫХ ===
-    let audio = null;           // Объект аудиоплеера
-    let segments = [];          // Массив сегментов транскрипта
-    let currentAudio = null;    // Текущее аудио
+      let audio = null;
+      let segments = [];
+      let currentAudio = null;
 
-    // === 1. ПОЛУЧЕНИЕ СПИСКА АУДИОФАЙЛОВ ===
-    async function loadAudioList() {
-      const listEl = document.getElementById('audioList');
-      listEl.innerHTML = '<p class="warn">⏳ Поиск аудиозаписей...</p>';
+      // === КЭШИРОВАНИЕ ===
+      const transcriptCache = new Map();
+      const audioCache = new Map();
+      const loadingState = new Map();
 
-      try {
-        // Список известных файлов (если files.txt не работает)
-        const knownFiles = [
-          'и_понимаете_и_этому_всему_свои_этапы.mp3',
-          'он_пишет_дух_человека.mp3',
-          'подожди_батюшка_дай_я_включу.mp3'
-        ];
+      // === 1. ЗАГРУЗКА СПИСКА АУДИО ===
+      async function loadAudioList() {
+        const listEl = document.getElementById("audioList");
+        listEl.innerHTML = '<p class="warn">⏳ Поиск аудиозаписей...</p>';
 
-        // Сначала пробуем загрузить список из файла
-        let audioFiles = knownFiles;
         try {
-          const response = await fetch('files.txt');
-          if (response.ok) {
-            const text = await response.text();
-            const filesFromFile = text.split('\n')
-              .filter(line => line.trim() && (line.includes('.mp3') || line.includes('.wav') || line.includes('.ogg')))
-              .map(line => line.trim());
+          let audioFiles = [];
 
-            if (filesFromFile.length > 0) {
-              audioFiles = filesFromFile;
-              console.log('Загружен список из files.txt:', audioFiles);
+          // Пробуем загрузить files.txt
+          try {
+            const response = await fetch("files.txt");
+            if (response.ok) {
+              const text = await response.text();
+              audioFiles = text
+                .split("\n")
+                .filter(
+                  (line) => line.trim() && line.match(/\.(mp3|wav|ogg)$/i)
+                )
+                .map((line) => line.trim());
+            }
+          } catch (e) {
+            console.log("Использую стандартный список");
+          }
+
+          // Если не нашли файлов, используем стандартный список
+          if (audioFiles.length === 0) {
+            audioFiles = [
+              "и_понимаете_и_этому_всему_свои_этапы.mp3",
+              "он_пишет_дух_человека.mp3",
+              "подожди_батюшка_дай_я_включу.mp3",
+            ];
+          }
+
+          // Создаем список с адаптивными названиями
+          listEl.innerHTML = audioFiles
+            .map((file) => {
+              const baseName = file.replace(/\.(mp3|wav|ogg)$/i, "");
+              const fullName = baseName.replace(/_/g, " ");
+
+              // Адаптируем длину названия для мобильных
+              let displayName = fullName;
+              const isMobile = window.innerWidth <= 768;
+
+              if (isMobile && fullName.length > 25) {
+                displayName = fullName.substring(0, 22) + "...";
+              }
+
+              const isCached = transcriptCache.has(baseName);
+              const cacheIcon = isCached ? " 💾" : "";
+
+              return `<div class="audio-item" data-filename="${file}" 
+                  onclick="loadRecording('${file}')" title="${fullName}">
+                  🎧 ${displayName}${cacheIcon}
+                </div>`;
+            })
+            .join("");
+
+          setStatus(`✅ Найдено ${audioFiles.length} аудиозаписей`, "success");
+        } catch (err) {
+          console.error("Ошибка:", err);
+          listEl.innerHTML = `<p class="error">❌ ${err.message}</p>`;
+          setStatus(`❌ Ошибка загрузки`, "error");
+        }
+      }
+
+      // === 2. ЗАГРУЗКА АУДИОЗАПИСИ ===
+      async function loadRecording(audioFilename) {
+        const baseName = audioFilename.replace(/\.(mp3|wav|ogg)$/i, "");
+
+        if (loadingState.get(baseName)) return;
+        loadingState.set(baseName, true);
+
+        const audioUrl = `${AUDIO_DIR}${audioFilename}`;
+        setStatus(
+          `<span class="loading-indicator"></span> Загрузка: ${baseName.replace(
+            /_/g,
+            " "
+          )}...`,
+          "warn"
+        );
+
+        // Обновляем активный элемент
+        document.querySelectorAll(".audio-item").forEach((el) => {
+          el.classList.remove("active");
+          const filename = el.getAttribute("data-filename");
+          if (filename) {
+            const name = filename.replace(/\.(mp3|wav|ogg)$/i, "");
+            if (loadingState.get(name)) {
+              el.innerHTML = el.innerHTML.replace("🎧", "⏳");
             }
           }
-        } catch (e) {
-          console.log('Использую стандартный список файлов');
+        });
+
+        const activeItem = document.querySelector(
+          `.audio-item[data-filename="${audioFilename}"]`
+        );
+        if (activeItem) {
+          activeItem.classList.add("active");
+          activeItem.innerHTML = activeItem.innerHTML.replace("🎧", "⏳");
         }
 
-        // Если файлов нет - показываем сообщение
-        if (audioFiles.length === 0) {
-          listEl.innerHTML = '<p class="warn">Нет аудиофайлов</p>';
+        try {
+          // Загрузка аудио с кэшированием
+          let audioObjectUrl;
+          if (audioCache.has(audioUrl)) {
+            console.log("Кэш аудио:", baseName);
+            audioObjectUrl = audioCache.get(audioUrl);
+          } else {
+            const audioBlob = await fetch(audioUrl).then((r) => {
+              if (!r.ok) throw new Error(`Аудио не найдено: ${r.status}`);
+              return r.blob();
+            });
+            audioObjectUrl = URL.createObjectURL(audioBlob);
+            audioCache.set(audioUrl, audioObjectUrl);
+          }
+
+          // Инициализация плеера
+          if (!audio) {
+            audio = new Audio();
+            audio.controls = true;
+            audio.style.width = "100%";
+            audio.addEventListener("timeupdate", updateActiveSegment);
+          }
+
+          audio.src = audioObjectUrl;
+          document.getElementById("player").innerHTML = "";
+          document.getElementById("player").appendChild(audio);
+          currentAudio = baseName;
+
+          // Загрузка транскрипта с кэшированием
+          if (transcriptCache.has(baseName)) {
+            console.log("Кэш транскрипта:", baseName);
+            segments = transcriptCache.get(baseName);
+            renderTranscript();
+            setStatus(
+              `✅ ${baseName.replace(/_/g, " ")} (из кэша) — ${
+                segments.length
+              } сегментов`,
+              "success"
+            );
+            updateCacheIcons();
+          } else {
+            const transcriptData = await loadTranscriptFile(baseName);
+
+            if (transcriptData) {
+              segments = parseTranscript(transcriptData.text);
+              transcriptCache.set(baseName, segments);
+              console.log("Сохранено в кэш:", baseName);
+
+              renderTranscript();
+              setStatus(
+                `✅ ${baseName.replace(/_/g, " ")} — ${
+                  segments.length
+                } сегментов`,
+                "success"
+              );
+              updateCacheIcons();
+            } else {
+              segments = [];
+              renderTranscript();
+              setStatus(`⚠️ Аудио загружено, транскрипт не найден`, "warn");
+            }
+          }
+
+          // Закрываем мобильное меню после выбора
+          closeMobileMenu();
+        } catch (err) {
+          setStatus(`❌ Ошибка: ${err.message}`, "error");
+          console.error("Ошибка:", err);
+        } finally {
+          loadingState.set(baseName, false);
+          if (activeItem && !transcriptCache.has(baseName)) {
+            const displayName = audioFilename
+              .replace(/\.(mp3|wav|ogg)$/i, "")
+              .replace(/_/g, " ");
+            activeItem.innerHTML = `🎧 ${displayName}`;
+          }
+        }
+      }
+
+      // === 3. ЗАГРУЗКА ФАЙЛА ТРАНСКРИПТА ===
+      async function loadTranscriptFile(baseName) {
+        const extensions = [".md", ".txt"];
+        const nameVariants = [baseName, baseName.replace(/_/g, " ")];
+
+        for (const name of nameVariants) {
+          for (const ext of extensions) {
+            const url = `${TRANSCRIPT_DIR}${name}${ext}`;
+            try {
+              const response = await fetch(url);
+              if (response.ok) {
+                return { text: await response.text(), ext };
+              }
+            } catch (e) {}
+          }
+        }
+        return null;
+      }
+
+      // === 4. ПАРСИНГ ТРАНСКРИПТА ===
+      function parseTranscript(text) {
+        const startIndex = text.indexOf("### [");
+        if (startIndex !== -1) text = text.slice(startIndex);
+
+        const rawSegments = text.split(/^(?=### \[)/m).filter(Boolean);
+
+        return rawSegments
+          .map((seg, i, arr) => {
+            const headerMatch = seg.match(
+              /^### \[(\d{1,2}):(\d{2}):(\d{2})\]\s*(.*)/
+            );
+            if (!headerMatch) return null;
+
+            const h = parseInt(headerMatch[1]) || 0;
+            const m = parseInt(headerMatch[2]) || 0;
+            const s = parseInt(headerMatch[3]) || 0;
+            const title = headerMatch[4] || "";
+            const textLines = seg
+              .split("\n")
+              .slice(1)
+              .filter((l) => l.trim());
+            const text = textLines.join("\n").trim();
+            const start = h * 3600 + m * 60 + s;
+
+            const nextMatch =
+              i < arr.length - 1
+                ? arr[i + 1].match(/^### \[(\d{1,2}):(\d{2}):(\d{2})\]/)
+                : null;
+            const end = nextMatch
+              ? parseInt(nextMatch[1] || 0) * 3600 +
+                parseInt(nextMatch[2] || 0) * 60 +
+                parseInt(nextMatch[3] || 0)
+              : start + 60;
+
+            return { start, end, title, text };
+          })
+          .filter(Boolean);
+      }
+
+      // === 5. ВОСПРОИЗВЕДЕНИЕ СЕГМЕНТА ===
+      function playSegment(i) {
+        const seg = segments[i];
+        if (!seg || !audio) return;
+
+        document
+          .querySelectorAll(".segment")
+          .forEach((el) => el.classList.remove("active"));
+        const el = document.querySelectorAll(".segment")[i];
+        el?.classList.add("active");
+
+        audio.currentTime = seg.start;
+        audio.play().catch((e) => {
+          setStatus("▶️ Нажмите play в плеере", "warn");
+        });
+
+        el?.scrollIntoView({ behavior: "smooth", block: "center" });
+      }
+
+      // === 6. ОТОБРАЖЕНИЕ ТРАНСКРИПТА ===
+      function renderTranscript() {
+        const el = document.getElementById("transcript");
+
+        if (segments.length === 0) {
+          el.innerHTML = "<p><i>Транскрипция отсутствует</i></p>";
           return;
         }
 
-        // Создаем список аудиозаписей
-        listEl.innerHTML = audioFiles.map(file => {
-          const displayName = file.replace(/\.(mp3|wav|ogg)$/i, '').replace(/_/g, ' ');
-          return `<div class="audio-item" data-filename="${file}" onclick="loadRecording('${file}')">
-                    🎧 ${displayName}
-                  </div>`;
-        }).join('');
+        el.innerHTML = segments
+          .map((seg, i) => {
+            const timeFormatted = formatTime(seg.start);
+            const textHTML = seg.text
+              ? `<div style="margin-top:8px;font-size:0.95em;">${seg.text.replace(
+                  /\n/g,
+                  "<br>"
+                )}</div>`
+              : "";
 
-        setStatus(`✅ Найдено ${audioFiles.length} аудиозаписей`, 'success');
-
-      } catch (err) {
-        console.error('Ошибка загрузки списка аудио:', err);
-        listEl.innerHTML = `<p class="error">❌ ${err.message}</p>`;
-        setStatus(`❌ Ошибка: ${err.message}`, 'error');
-      }
-    }
-
-    // === 2. ЗАГРУЗКА КОНКРЕТНОЙ АУДИОЗАПИСИ ===
-    async function loadRecording(audioFilename) {
-      // Очищаем предыдущее аудио
-      if (audio) {
-        audio.pause();
-      }
-
-      const baseName = audioFilename.replace(/\.(mp3|wav|ogg)$/i, '');
-      const audioUrl = `${AUDIO_DIR}${audioFilename}`;
-
-      setStatus(`⏳ Загрузка: ${baseName}...`, 'warn');
-
-      // Выделяем выбранный элемент в списке
-      document.querySelectorAll('.audio-item').forEach(el => el.classList.remove('active'));
-      const activeItem = document.querySelector(`.audio-item[data-filename="${audioFilename}"]`);
-      if (activeItem) {
-        activeItem.classList.add('active');
-      }
-
-      try {
-        // Загружаем аудиофайл
-        const audioBlob = await fetch(audioUrl).then(r => {
-          if (!r.ok) throw new Error(`Аудио не найдено: ${r.status}`);
-          return r.blob();
-        });
-
-        // Создаем URL для аудио
-        const audioObjectUrl = URL.createObjectURL(audioBlob);
-
-        // Создаем или обновляем аудиоплеер
-        if (!audio) {
-          audio = new Audio();
-          audio.controls = true;
-          audio.style.width = '100%';
-          // Следим за временем воспроизведения
-          audio.addEventListener('timeupdate', updateActiveSegment);
-        }
-
-        audio.src = audioObjectUrl;
-        document.getElementById('player').innerHTML = '';
-        document.getElementById('player').appendChild(audio);
-        currentAudio = baseName;
-
-        // Пробуем загрузить транскрипт
-        let transcriptText = null;
-        let transcriptExt = null;
-
-        // Пробуем разные расширения файлов
-        for (const ext of ['.md', '.txt']) {
-          try {
-            const url = `${TRANSCRIPT_DIR}${baseName}${ext}`;
-            const response = await fetch(url);
-            if (response.ok) {
-              transcriptText = await response.text();
-              transcriptExt = ext;
-              console.log(`Транскрипт найден: ${url}`);
-              break;
-            }
-          } catch (e) {
-            // Игнорируем ошибки, пробуем следующий вариант
-          }
-        }
-
-        // Если не нашли, пробуем вариант с пробелами вместо подчеркиваний
-        if (!transcriptText) {
-          const nameWithSpaces = baseName.replace(/_/g, ' ');
-          for (const ext of ['.md', '.txt']) {
-            try {
-              const url = `${TRANSCRIPT_DIR}${nameWithSpaces}${ext}`;
-              const response = await fetch(url);
-              if (response.ok) {
-                transcriptText = await response.text();
-                transcriptExt = ext;
-                console.log(`Транскрипт найден: ${url}`);
-                break;
-              }
-            } catch (e) {
-              // Игнорируем
-            }
-          }
-        }
-
-        // Обрабатываем транскрипт
-        if (transcriptText) {
-          segments = parseTranscript(transcriptText);
-          renderTranscript();
-          setStatus(`✅ ${baseName} — ${segments.length} сегментов`, 'success');
-        } else {
-          segments = [];
-          renderTranscript();
-          setStatus(`⚠️ Аудио загружено, транскрипт не найден`, 'warn');
-        }
-
-      } catch (err) {
-        setStatus(`❌ Ошибка: ${err.message}`, 'error');
-        console.error('Ошибка загрузки записи:', err);
-      }
-    }
-
-    // === 3. ПАРСИНГ ТРАНСКРИПТА (разбор текста) ===
-    function parseTranscript(text) {
-      // Убираем начало (если есть метаданные)
-      const startIndex = text.indexOf('### [');
-      if (startIndex !== -1) {
-        text = text.slice(startIndex);
-      }
-
-      // Разделяем на сегменты по заголовкам
-      const rawSegments = text.split(/^(?=### \[)/m).filter(Boolean);
-
-      // Обрабатываем каждый сегмент
-      return rawSegments.map((seg, i, arr) => {
-        // Ищем заголовок вида "### [00:00:00] Текст"
-        const headerMatch = seg.match(/^### \[(\d{1,2}):(\d{2}):(\d{2})\]\s*(.*)/);
-        if (!headerMatch) return null;
-
-        // Извлекаем время
-        const h = parseInt(headerMatch[1]) || 0;
-        const m = parseInt(headerMatch[2]) || 0;
-        const s = parseInt(headerMatch[3]) || 0;
-        const title = headerMatch[4] || '';
-
-        // Извлекаем текст сегмента
-        const textLines = seg.split('\n').slice(1).filter(l => l.trim());
-        const text = textLines.join('\n').trim();
-
-        // Вычисляем время начала и конца
-        const start = h * 3600 + m * 60 + s;
-        
-        // Время окончания - из следующего сегмента или +60 секунд
-        let end;
-        if (i < arr.length - 1) {
-          const nextMatch = arr[i + 1].match(/^### \[(\d{1,2}):(\d{2}):(\d{2})\]/);
-          if (nextMatch) {
-            end = (parseInt(nextMatch[1] || 0) * 3600 + parseInt(nextMatch[2] || 0) * 60 + parseInt(nextMatch[3] || 0));
-          } else {
-            end = start + 60;
-          }
-        } else {
-          end = start + 60;
-        }
-
-        return { start, end, title, text };
-      }).filter(Boolean); // Убираем null
-    }
-
-    // === 4. ВОСПРОИЗВЕДЕНИЕ СЕГМЕНТА ===
-    function playSegment(i) {
-      const seg = segments[i];
-      if (!seg || !audio) return;
-
-      // Убираем выделение со всех сегментов
-      document.querySelectorAll('.segment').forEach(el => el.classList.remove('active'));
-      
-      // Выделяем текущий сегмент
-      const el = document.querySelectorAll('.segment')[i];
-      if (el) {
-        el.classList.add('active');
-        // Прокручиваем к сегменту
-        el.scrollIntoView({ behavior: 'smooth', block: 'center' });
-      }
-
-      // Устанавливаем время и запускаем воспроизведение
-      audio.currentTime = seg.start;
-      audio.play().catch(e => {
-        console.warn('Автовоспроизведение заблокировано:', e);
-        setStatus('▶️ Нажмите на кнопку play в плеере', 'warn');
-      });
-    }
-
-    // === 5. ОТОБРАЖЕНИЕ ТРАНСКРИПТА ===
-    function renderTranscript() {
-      const el = document.getElementById('transcript');
-      
-      if (segments.length === 0) {
-        el.innerHTML = '<p><i>Транскрипция отсутствует</i></p>';
-        return;
-      }
-
-      // Создаем HTML для каждого сегмента
-      el.innerHTML = segments.map((seg, i) => {
-        const timeFormatted = formatTime(seg.start);
-        const textHTML = seg.text ? 
-          `<div style="margin-top:6px;font-size:0.95em;">${seg.text.replace(/\n/g, '<br>')}</div>` : 
-          '';
-        
-        return `<div class="segment" onclick="playSegment(${i})">
+            return `<div class="segment" onclick="playSegment(${i})">
                   <div>
                     <span class="timestamp">[${timeFormatted}]</span>
                     <strong>${seg.title}</strong>
                   </div>
                   ${textHTML}
                 </div>`;
-      }).join('');
-    }
-
-    // === 6. ФОРМАТИРОВАНИЕ ВРЕМЕНИ (секунды → ЧЧ:ММ:СС) ===
-    function formatTime(seconds) {
-      seconds = Math.floor(seconds);
-      const hours = Math.floor(seconds / 3600);
-      const minutes = Math.floor((seconds % 3600) / 60);
-      const secs = seconds % 60;
-      
-      // Добавляем ведущие нули
-      const pad = (num) => num.toString().padStart(2, '0');
-      
-      if (hours > 0) {
-        return `${pad(hours)}:${pad(minutes)}:${pad(secs)}`;
-      } else {
-        return `${pad(minutes)}:${pad(secs)}`;
+          })
+          .join("");
       }
-    }
 
-    // === 7. ОБНОВЛЕНИЕ СТАТУСА ===
-    function setStatus(message, type = 'warn') {
-      const el = document.getElementById('status');
-      el.className = type;
-      el.innerHTML = message;
-    }
+      // === 7. ФОРМАТИРОВАНИЕ ВРЕМЕНИ ===
+      function formatTime(seconds) {
+        seconds = Math.floor(seconds);
+        const hours = Math.floor(seconds / 3600);
+        const minutes = Math.floor((seconds % 3600) / 60);
+        const secs = seconds % 60;
 
-    // === 8. ПОИСК ПО ТРАНСКРИПТАМ ===
-    function setupSearch() {
-      const searchInput = document.getElementById('searchInput');
-      const clearButton = document.querySelector('.clear-search');
-      
-      if (!searchInput) return;
-      
-      // Поиск при вводе текста
-      searchInput.addEventListener('input', function() {
-        const searchTerm = this.value.trim().toLowerCase();
-        
-        if (searchTerm === '') {
-          // Если поиск пустой - показываем все
-          renderTranscript();
-          setStatus(`Показаны все ${segments.length} сегментов`, 'success');
-          return;
+        const pad = (num) => num.toString().padStart(2, "0");
+
+        if (hours > 0) {
+          return `${pad(hours)}:${pad(minutes)}:${pad(secs)}`;
+        } else {
+          return `${pad(minutes)}:${pad(secs)}`;
         }
-        
-        // Ищем совпадения
-        const filteredSegments = segments.filter(seg => {
-          const titleMatch = seg.title.toLowerCase().includes(searchTerm);
-          const textMatch = seg.text.toLowerCase().includes(searchTerm);
-          return titleMatch || textMatch;
-        });
-        
-        // Отображаем результаты
-        const transcriptEl = document.getElementById('transcript');
-        
-        if (filteredSegments.length > 0) {
-          transcriptEl.innerHTML = filteredSegments.map((seg, i) => {
-            // Находим оригинальный индекс для воспроизведения
-            const originalIndex = segments.indexOf(seg);
-            
-            // Подсвечиваем найденный текст
-            const highlight = (text) => {
-              if (!text) return '';
-              const regex = new RegExp(`(${searchTerm})`, 'gi');
-              return text.replace(regex, '<mark>$1</mark>');
-            };
-            
-            return `<div class="segment" onclick="playSegment(${originalIndex})">
+      }
+
+      // === 8. ОБНОВЛЕНИЕ СТАТУСА ===
+      function setStatus(message, type = "warn") {
+        const el = document.getElementById("status");
+        el.className = type;
+        el.innerHTML = message;
+      }
+
+      // === 9. ПОИСК ПО ТРАНСКРИПТАМ ===
+      function setupSearch() {
+        const searchInput = document.getElementById("searchInput");
+        const clearButton = document.querySelector(".clear-search");
+
+        if (!searchInput) return;
+
+        searchInput.addEventListener("input", function () {
+          const searchTerm = this.value.trim().toLowerCase();
+
+          if (searchTerm === "") {
+            renderTranscript();
+            setStatus(`Показаны все ${segments.length} сегментов`, "success");
+            return;
+          }
+
+          const filteredSegments = segments.filter(
+            (seg) =>
+              seg.title.toLowerCase().includes(searchTerm) ||
+              seg.text.toLowerCase().includes(searchTerm)
+          );
+
+          const transcriptEl = document.getElementById("transcript");
+
+          if (filteredSegments.length > 0) {
+            transcriptEl.innerHTML = filteredSegments
+              .map((seg, i) => {
+                const originalIndex = segments.indexOf(seg);
+                const highlight = (text) =>
+                  text
+                    ? text.replace(
+                        new RegExp(`(${searchTerm})`, "gi"),
+                        "<mark>$1</mark>"
+                      )
+                    : "";
+
+                return `<div class="segment" onclick="playSegment(${originalIndex})">
                       <div>
-                        <span class="timestamp">[${formatTime(seg.start)}]</span>
+                        <span class="timestamp">[${formatTime(
+                          seg.start
+                        )}]</span>
                         <strong>${highlight(seg.title)}</strong>
                       </div>
-                      ${seg.text ? `<div style="margin-top:6px;font-size:0.95em;">${highlight(seg.text.replace(/\n/g, '<br>'))}</div>` : ''}
+                      ${
+                        seg.text
+                          ? `<div style="margin-top:8px;font-size:0.95em;">${highlight(
+                              seg.text.replace(/\n/g, "<br>")
+                            )}</div>`
+                          : ""
+                      }
                     </div>`;
-          }).join('');
-          
-          setStatus(`🔍 Найдено ${filteredSegments.length} сегментов по запросу "${searchTerm}"`, 'success');
-        } else {
-          transcriptEl.innerHTML = `<p><i>По запросу "${searchTerm}" ничего не найдено</i></p>`;
-          setStatus(`🔍 Ничего не найдено по запросу "${searchTerm}"`, 'warn');
+              })
+              .join("");
+
+            setStatus(
+              `🔍 Найдено ${filteredSegments.length} сегментов`,
+              "success"
+            );
+          } else {
+            transcriptEl.innerHTML = `<p><i>По запросу "${searchTerm}" ничего не найдено</i></p>`;
+            setStatus(`🔍 Ничего не найдено`, "warn");
+          }
+        });
+
+        if (clearButton) {
+          clearButton.addEventListener("click", () => {
+            searchInput.value = "";
+            renderTranscript();
+            setStatus(`Показаны все ${segments.length} сегментов`, "success");
+          });
         }
-      });
-      
-      // Кнопка очистки поиска
-      if (clearButton) {
-        clearButton.addEventListener('click', () => {
-          searchInput.value = '';
-          renderTranscript();
-          setStatus(`Показаны все ${segments.length} сегментов`, 'success');
+      }
+
+      // === 10. МОБИЛЬНОЕ МЕНЮ ===
+      function setupMobileMenu() {
+        const toggleButton = document.getElementById("mobileMenuToggle");
+        const sidebar = document.getElementById("sidebar");
+
+        if (!toggleButton || !sidebar) return;
+
+        toggleButton.addEventListener("click", () => {
+          sidebar.classList.toggle("visible");
+          const icon = toggleButton.querySelector("span");
+          icon.textContent = sidebar.classList.contains("visible") ? "✕" : "☰";
         });
       }
-    }
 
-    // === 9. ПОДСВЕТКА ТЕКУЩЕГО СЕГМЕНТА ПРИ ВОСПРОИЗВЕДЕНИИ ===
-    function updateActiveSegment() {
-      if (!audio || segments.length === 0) return;
-      
-      const currentTime = audio.currentTime;
-      
-      // Ищем текущий сегмент
-      for (let i = 0; i < segments.length; i++) {
-        if (currentTime >= segments[i].start && currentTime < segments[i].end) {
-          // Выделяем текущий сегмент
-          document.querySelectorAll('.segment').forEach((el, index) => {
-            if (index === i) {
-              el.classList.add('active');
-            } else {
-              el.classList.remove('active');
-            }
-          });
-          break;
-        }
-      }
-    }
-
-    // === 10. СОХРАНЕНИЕ СОСТОЯНИЯ (какая запись играла) ===
-    function saveState() {
-      if (currentAudio && audio) {
-        const state = {
-          audio: currentAudio,
-          time: audio.currentTime,
-          volume: audio.volume
-        };
-        localStorage.setItem('audioArchive', JSON.stringify(state));
-      }
-    }
-
-    function loadState() {
-      try {
-        const saved = localStorage.getItem('audioArchive');
-        if (saved) {
-          const state = JSON.parse(saved);
-          
-          // Восстанавливаем громкость
-          if (audio && state.volume) {
-            audio.volume = state.volume;
+      function closeMobileMenu() {
+        if (window.innerWidth <= 768) {
+          const sidebar = document.getElementById("sidebar");
+          const toggleButton = document.getElementById("mobileMenuToggle");
+          if (sidebar && toggleButton) {
+            sidebar.classList.remove("visible");
+            toggleButton.querySelector("span").textContent = "☰";
           }
         }
-      } catch (e) {
-        console.log('Не удалось загрузить сохраненное состояние');
       }
-    }
 
-    // === 11. СДЕЛАЕМ ФУНКЦИИ ДОСТУПНЫМИ ИЗ HTML ===
-    window.playSegment = playSegment;
-    window.loadRecording = loadRecording;
+      // === 11. УПРАВЛЕНИЕ КЭШЕМ ===
+      function updateCacheIcons() {
+        document.querySelectorAll(".audio-item").forEach((el) => {
+          const filename = el.getAttribute("data-filename");
+          if (filename) {
+            const baseName = filename.replace(/\.(mp3|wav|ogg)$/i, "");
+            if (transcriptCache.has(baseName) && !el.innerHTML.includes("💾")) {
+              el.innerHTML = el.innerHTML.replace("🎧", "🎧💾");
+            }
+          }
+        });
+      }
 
-    // === 12. ЗАПУСК ПРИ ЗАГРУЗКЕ СТРАНИЦЫ ===
-    document.addEventListener('DOMContentLoaded', () => {
-      console.log('Страница загружена, запускаю приложение...');
-      
-      // 1. Загружаем список аудио
-      loadAudioList();
-      
-      // 2. Настраиваем поиск
-      setupSearch();
-      
-      // 3. Загружаем сохраненное состояние
-      loadState();
-      
-      // 4. Сохраняем состояние при закрытии страницы
-      window.addEventListener('beforeunload', saveState);
-      
-      console.log('Приложение запущено!');
-    });
+      function clearCache() {
+        transcriptCache.clear();
+        audioCache.forEach((url) => URL.revokeObjectURL(url));
+        audioCache.clear();
 
-  </script>
-</body>
+        // Обновляем иконки
+        document.querySelectorAll(".audio-item").forEach((el) => {
+          el.innerHTML = el.innerHTML.replace("💾", "");
+        });
 
+        setStatus("✅ Кэш очищен", "success");
+        console.log("Кэш очищен");
+      }
+
+      function showCacheInfo() {
+        const info = `Транскриптов: ${transcriptCache.size}, Аудио: ${audioCache.size}`;
+        setStatus(`💾 Кэш: ${info}`, "success");
+        console.log("Кэш:", info);
+      }
+
+      // === 12. ОБРАБОТЧИКИ СОБЫТИЙ ===
+      function updateActiveSegment() {
+        if (!audio || segments.length === 0) return;
+
+        const currentTime = audio.currentTime;
+        document.querySelectorAll(".segment").forEach((el, i) => {
+          const seg = segments[i];
+          if (seg && currentTime >= seg.start && currentTime < seg.end) {
+            el.classList.add("active");
+          } else {
+            el.classList.remove("active");
+          }
+        });
+      }
+
+      // === 13. АДАПТИВНОСТЬ ПРИ ИЗМЕНЕНИИ РАЗМЕРА ===
+      let resizeTimeout;
+      window.addEventListener("resize", () => {
+        clearTimeout(resizeTimeout);
+        resizeTimeout = setTimeout(() => {
+          // Автоматически закрываем меню при переходе на десктоп
+          if (window.innerWidth > 768) {
+            closeMobileMenu();
+          }
+        }, 250);
+      });
+
+      // === 14. ЭКСПОРТ ФУНКЦИЙ ===
+      window.playSegment = playSegment;
+      window.loadRecording = loadRecording;
+      window.clearCache = clearCache;
+      window.showCacheInfo = showCacheInfo;
+
+      // === 15. ЗАПУСК ПРИЛОЖЕНИЯ ===
+      document.addEventListener("DOMContentLoaded", () => {
+        console.log("🚀 Запуск аудиоархива...");
+
+        loadAudioList();
+        setupSearch();
+        setupMobileMenu();
+
+        // Очистка кэша при закрытии
+        window.addEventListener("beforeunload", () => {
+          audioCache.forEach((url) => URL.revokeObjectURL(url));
+        });
+
+        console.log("✅ Приложение запущено");
+      });
+    </script>
+  </body>
 </html>
