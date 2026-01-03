@@ -9,3 +9,4 @@ settings.json
 *.log
 __pycache__/
 *.pyc
+editor_full.html
