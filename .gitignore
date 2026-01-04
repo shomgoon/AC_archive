@@ -11,3 +11,16 @@ __pycache__/
 *.pyc
 editor_full.html
 readme.txt
+pythonProject/
+
+# PyCharm
+.idea/
+*.iml
+
+# Virtual Environment
+.venv/
+venv/
+
+# Python
+__pycache__/
+*.pyc
