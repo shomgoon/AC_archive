@@ -450,7 +450,7 @@
       const audioCache = new Map();
       const loadingState = new Map();
 
-      // === 1. ЗАГРУЗКА СПИСКА АУДИО ===
+      // === 1. ЗАГРУЗКА СПИСКА АУДИО (упрощенная версия) ===
       async function loadAudioList() {
         const listEl = document.getElementById("audioList");
         listEl.innerHTML = '<p class="warn">⏳ Поиск аудиозаписей...</p>';
@@ -463,24 +463,33 @@
             const response = await fetch("files.txt");
             if (response.ok) {
               const text = await response.text();
+              console.log("✅ files.txt загружен, содержимое:", text);
+
               audioFiles = text
-                .split("\n")
-                .filter(
-                  (line) => line.trim() && line.match(/\.(mp3|wav|ogg)$/i)
-                )
-                .map((line) => line.trim());
+                .split(/\r?\n/) // Обрабатываем любые переносы строк
+                .map((line) => line.trim()) // Убираем пробелы
+                .filter((line) => {
+                  const cleanLine = line.replace(/^\uFEFF/, ""); // Убираем BOM если есть
+                  return cleanLine && /\.(mp3|wav|ogg)$/i.test(cleanLine);
+                })
+                .map((line) => line.replace(/^\uFEFF/, "").trim()); // Очищаем окончательно
+
+              console.log("📁 Найдено файлов:", audioFiles.length, audioFiles);
             }
           } catch (e) {
-            console.log("Использую стандартный список");
+            console.error("❌ Ошибка загрузки files.txt:", e);
+            throw new Error("Не удалось загрузить список аудиофайлов");
           }
 
-          // Если не нашли файлов, используем стандартный список
+          // УБИРАЕМ стандартный список - используем ТОЛЬКО files.txt
           if (audioFiles.length === 0) {
-            audioFiles = [
-              "и_понимаете_и_этому_всему_свои_этапы.mp3",
-              "он_пишет_дух_человека.mp3",
-              "подожди_батюшка_дай_я_включу.mp3",
-            ];
+            listEl.innerHTML = `
+        <p class="error">
+          ❌ Не найдено аудиофайлов.<br>
+          Создайте файл files.txt со списком MP3 файлов.
+        </p>`;
+            setStatus(`❌ Нет аудиофайлов`, "error");
+            return;
           }
 
           // Создаем список с адаптивными названиями

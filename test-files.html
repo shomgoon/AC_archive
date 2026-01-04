@@ -1,0 +1,10 @@
+<!DOCTYPE html>
+<script>
+  async function test() {
+    const response = await fetch("files.txt");
+    const text = await response.text();
+    console.log("files.txt содержимое:", text);
+    console.log("Строки:", text.split("\n"));
+  }
+  test();
+</script>
