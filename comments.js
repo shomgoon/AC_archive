@@ -147,8 +147,8 @@ function displayComments(comments) {
     if (!container) return;
 
     let html = `
-        <h2 class="comments-title">💬 Комментарии к "${shortName}"</h2>
-    `;
+    <h2 class="comments-title">💬 Комментарии к "${currentAudioId}"</h2>
+`;
     if (!comments || comments.length === 0) {
       html += `
                 <p style="color: #666; text-align: center; padding: 20px;">
