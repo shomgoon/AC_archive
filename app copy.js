@@ -11,115 +11,51 @@ const transcriptCache = new Map();
 const audioCache = new Map();
 const loadingState = new Map();
 
-// === 1. ЗАГРУЗКА СПИСКА АУДИО (ОБНОВЛЕННАЯ) ===
-// === 1. ЗАГРУЗКА СПИСКА АУДИО (ОБНОВЛЕННАЯ) ===
+// === 1. ЗАГРУЗКА СПИСКА АУДИО (упрощенная версия) ===
 async function loadAudioList() {
   const listEl = document.getElementById("audioList");
   listEl.innerHTML = '<p class="warn">⏳ Поиск аудиозаписей...</p>';
 
   try {
     let audioFiles = [];
-    let usingDefaultList = false;
 
     // Пробуем загрузить files.txt
     try {
       const response = await fetch("files.txt");
       if (response.ok) {
         const text = await response.text();
-        console.log("📄 Содержимое files.txt:", text);
+        console.log("✅ files.txt загружен, содержимое:", text);
 
         audioFiles = text
-          .split("\n")
+          .split(/\r?\n/) // Обрабатываем любые переносы строк
+          .map((line) => line.trim()) // Убираем пробелы
           .filter((line) => {
-            const trimmed = line.trim();
-            return trimmed && trimmed.match(/\.(mp3|wav|ogg)$/i);
+            const cleanLine = line.replace(/^\uFEFF/, ""); // Убираем BOM если есть
+            return cleanLine && /\.(mp3|wav|ogg)$/i.test(cleanLine);
           })
-          .map((line) => line.trim());
+          .map((line) => line.replace(/^\uFEFF/, "").trim()); // Очищаем окончательно
 
-        console.log("✅ Файлов из files.txt:", audioFiles.length);
-      } else {
-        console.log("❌ files.txt не найден или ошибка загрузки");
+        console.log("📁 Найдено файлов:", audioFiles.length, audioFiles);
       }
     } catch (e) {
-      console.log("⚠️ Ошибка загрузки files.txt:", e.message);
+      console.error("❌ Ошибка загрузки files.txt:", e);
+      throw new Error("Не удалось загрузить список аудиофайлов");
     }
 
-    // Если не нашли файлов, используем стандартный список
+    // УБИРАЕМ стандартный список - используем ТОЛЬКО files.txt
     if (audioFiles.length === 0) {
-      usingDefaultList = true;
-      audioFiles = [
-        "и_понимаете_и_этому_всему_свои_этапы.mp3",
-        "он_пишет_дух_человека.mp3",
-        "подожди_батюшка_дай_я_включу.mp3",
-      ];
-      console.log(
-        "🔧 Использую стандартный список из",
-        audioFiles.length,
-        "файлов"
-      );
-    }
-
-    // ========== ПОЛУЧАЕМ ДЛИТЕЛЬНОСТИ ==========
-    console.log("⏳ Загружаю длительности для", audioFiles.length, "файлов...");
-
-    // Создаем массив промисов для загрузки длительностей
-    const durationPromises = audioFiles.map(async (file) => {
-      const audioUrl = `${AUDIO_DIR}${file}`;
-      console.log("📥 Проверяю файл:", audioUrl);
-
-      try {
-        // Сначала проверяем доступность файла
-        const response = await fetch(audioUrl, { method: "HEAD" });
-        if (!response.ok) {
-          console.warn(`❌ Файл недоступен: ${file} (${response.status})`);
-          return { file, duration: 0, error: `HTTP ${response.status}` };
-        }
-
-        const duration = await getAudioDuration(audioUrl);
-        console.log(`✅ ${file}: ${formatDuration(duration)}`);
-        return { file, duration };
-      } catch (error) {
-        console.warn(`⚠️ Ошибка для ${file}:`, error.message);
-        return { file, duration: 0, error: error.message };
-      }
-    });
-
-    // Ждем загрузки всех длительностей
-    const filesWithDurations = await Promise.all(durationPromises);
-
-    // Фильтруем только доступные файлы
-    const availableFiles = filesWithDurations.filter(
-      (item) => item.duration > 0 || !item.error
-    );
-
-    if (availableFiles.length === 0) {
-      listEl.innerHTML =
-        '<p class="error">❌ Не найдено доступных аудиофайлов</p>';
-      setStatus("❌ Аудиофайлы не найдены", "error");
+      listEl.innerHTML = `
+        <p class="error">
+          ❌ Не найдено аудиофайлов.<br>
+          Создайте файл files.txt со списком MP3 файлов.
+        </p>`;
+      setStatus(`❌ Нет аудиофайлов`, "error");
       return;
     }
 
-    // Создаем объект для быстрого доступа: имя файла -> длительность
-    const durationMap = {};
-    availableFiles.forEach(({ file, duration }) => {
-      durationMap[file] = duration;
-    });
-
-    console.log("✅ Длительности загружены:", durationMap);
-    console.log(
-      "📊 Доступных файлов:",
-      availableFiles.length,
-      "из",
-      audioFiles.length
-    );
-    console.log(
-      "📁 Список файлов:",
-      availableFiles.map((f) => f.file)
-    );
-
-    // Создаем список с адаптивными названиями И ДЛИТЕЛЬНОСТЬЮ
-    listEl.innerHTML = availableFiles
-      .map(({ file }) => {
+    // Создаем список с адаптивными названиями
+    listEl.innerHTML = audioFiles
+      .map((file) => {
         const baseName = file.replace(/\.(mp3|wav|ogg)$/i, "");
         const fullName = baseName.replace(/_/g, " ");
 
@@ -134,98 +70,24 @@ async function loadAudioList() {
         const isCached = transcriptCache.has(baseName);
         const cacheIcon = isCached ? " 💾" : "";
 
-        // Форматируем длительность
-        const duration = durationMap[file] || 0;
-        let durationHtml = "";
-
-        if (duration > 0) {
-          const formattedDuration = formatDuration(duration);
-          durationHtml = `<span class="audio-duration" title="Длительность: ${formattedDuration}">${formattedDuration}</span>`;
-        } else {
-          durationHtml = `<span class="audio-duration unknown" title="Длительность недоступна">--:--</span>`;
-        }
-
         return `<div class="audio-item" data-filename="${file}" 
                   onclick="loadRecording('${file}')" title="${fullName}">
-                  <div class="audio-item-content">
-                    <span class="audio-icon">🎧</span>
-                    <span class="audio-name">${displayName}${cacheIcon}</span>
-                    ${durationHtml}
-                  </div>
+                  🎧 ${displayName}${cacheIcon}
                 </div>`;
       })
       .join("");
 
-    setStatus(
-      `✅ Найдено ${availableFiles.length} аудиозаписей${
-        usingDefaultList ? " (стандартный список)" : ""
-      }`,
-      "success"
-    );
+    setStatus(`✅ Найдено ${audioFiles.length} аудиозаписей`, "success");
   } catch (err) {
-    console.error("❌ Критическая ошибка:", err);
+    console.error("Ошибка:", err);
     listEl.innerHTML = `<p class="error">❌ ${err.message}</p>`;
-    setStatus(`❌ Ошибка загрузки: ${err.message}`, "error");
+    setStatus(`❌ Ошибка загрузки`, "error");
   }
-}
-
-// ========== НОВАЯ ФУНКЦИЯ: Получение длительности аудио ==========
-async function getAudioDuration(audioUrl) {
-  return new Promise((resolve, reject) => {
-    const audio = new Audio();
-
-    audio.addEventListener("loadedmetadata", () => {
-      if (audio.duration && audio.duration !== Infinity) {
-        resolve(audio.duration);
-      } else {
-        reject(new Error("Не удалось определить длительность"));
-      }
-      // Очищаем ссылку на объект
-      audio.src = "";
-    });
-
-    audio.addEventListener("error", (e) => {
-      reject(
-        new Error(
-          `Ошибка загрузки: ${e.target.error?.message || "неизвестная ошибка"}`
-        )
-      );
-      audio.src = "";
-    });
-
-    // Устанавливаем таймаут на случай зависания
-    const timeout = setTimeout(() => {
-      audio.src = "";
-      reject(new Error("Таймаут загрузки"));
-    }, 10000); // 10 секунд
-
-    audio.addEventListener("loadedmetadata", () => clearTimeout(timeout), {
-      once: true,
-    });
-    audio.addEventListener("error", () => clearTimeout(timeout), {
-      once: true,
-    });
-
-    audio.src = audioUrl;
-  });
-}
-
-// ========== НОВАЯ ФУНКЦИЯ: Форматирование длительности ==========
-function formatDuration(seconds) {
-  if (!seconds || seconds === 0) return "0:00";
-  const mins = Math.floor(seconds / 60);
-  const secs = Math.floor(seconds % 60);
-  return `${mins}:${secs.toString().padStart(2, "0")}`;
 }
 
 // === 2. ЗАГРУЗКА АУДИОЗАПИСИ ===
 async function loadRecording(audioFilename) {
   const baseName = audioFilename.replace(/\.(mp3|wav|ogg)$/i, "");
-
-  // Обновляем текущую запись для комментариев
-  if (typeof updateCurrentAudio === "function") {
-    updateCurrentAudio(audioFilename);
-  }
 
   if (loadingState.get(baseName)) return;
   loadingState.set(baseName, true);
@@ -256,9 +118,7 @@ async function loadRecording(audioFilename) {
   );
   if (activeItem) {
     activeItem.classList.add("active");
-    // Меняем иконку на время загрузки
-    const audioIcon = activeItem.querySelector(".audio-icon");
-    if (audioIcon) audioIcon.textContent = "⏳";
+    activeItem.innerHTML = activeItem.innerHTML.replace("🎧", "⏳");
   }
 
   try {
@@ -329,18 +189,11 @@ async function loadRecording(audioFilename) {
     console.error("Ошибка:", err);
   } finally {
     loadingState.set(baseName, false);
-    if (activeItem) {
-      // Восстанавливаем иконку
-      const audioIcon = activeItem.querySelector(".audio-icon");
-      if (audioIcon) audioIcon.textContent = "🎧";
-
-      // Обновляем иконку кэша если нужно
-      if (transcriptCache.has(baseName)) {
-        const audioName = activeItem.querySelector(".audio-name");
-        if (audioName && !audioName.textContent.includes("💾")) {
-          audioName.textContent += " 💾";
-        }
-      }
+    if (activeItem && !transcriptCache.has(baseName)) {
+      const displayName = audioFilename
+        .replace(/\.(mp3|wav|ogg)$/i, "")
+        .replace(/_/g, " ");
+      activeItem.innerHTML = `🎧 ${displayName}`;
     }
   }
 }
@@ -453,7 +306,7 @@ function renderTranscript() {
     .join("");
 }
 
-// === 7. ФОРМАТИРОВАНИЕ ВРЕМЕНИ (общая функция) ===
+// === 7. ФОРМАТИРОВАНИЕ ВРЕМЕНИ ===
 function formatTime(seconds) {
   seconds = Math.floor(seconds);
   const hours = Math.floor(seconds / 3600);
@@ -577,11 +430,8 @@ function updateCacheIcons() {
     const filename = el.getAttribute("data-filename");
     if (filename) {
       const baseName = filename.replace(/\.(mp3|wav|ogg)$/i, "");
-      if (transcriptCache.has(baseName)) {
-        const audioName = el.querySelector(".audio-name");
-        if (audioName && !audioName.textContent.includes("💾")) {
-          audioName.textContent += " 💾";
-        }
+      if (transcriptCache.has(baseName) && !el.innerHTML.includes("💾")) {
+        el.innerHTML = el.innerHTML.replace("🎧", "🎧💾");
       }
     }
   });
@@ -594,10 +444,7 @@ function clearCache() {
 
   // Обновляем иконки
   document.querySelectorAll(".audio-item").forEach((el) => {
-    const audioName = el.querySelector(".audio-name");
-    if (audioName) {
-      audioName.textContent = audioName.textContent.replace(" 💾", "");
-    }
+    el.innerHTML = el.innerHTML.replace("💾", "");
   });
 
   setStatus("✅ Кэш очищен", "success");

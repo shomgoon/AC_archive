@@ -108,6 +108,12 @@ function setCurrentAudio(audioId) {
   }
 }
 
+// Функция для вызова из app.js
+function updateCurrentAudio(audioFilename) {
+  const baseName = audioFilename.replace(/\.(mp3|wav|ogg)$/i, "");
+  setCurrentAudio(baseName);
+}
+
 async function loadComments() {
   if (!supabase || !currentAudioId) {
     console.log("Не готово для загрузки комментариев");
@@ -147,46 +153,45 @@ function displayComments(comments) {
     if (!container) return;
 
     let html = `
-    <h2 class="comments-title">💬 Комментарии к "${currentAudioId}"</h2>
-`;
+      <div class="comments-section">
+        <h3 class="comments-title">💬 Комментарии к "${displayName}"</h3>
+    `;
+
     if (!comments || comments.length === 0) {
       html += `
-                <p style="color: #666; text-align: center; padding: 20px;">
-                    Пока нет комментариев. Будьте первым!
-                </p>
-            `;
+        <p class="no-comments">Пока нет комментариев. Будьте первым!</p>
+      `;
     } else {
       html += `
-                <div style="margin: 15px 0;">
-                    ${comments
-                      .map(
-                        (comment) => `
-                        <div class="comment" style="border: 1px solid #eee; padding: 15px; margin: 10px 0; border-radius: 5px; background: white;">
-                            <div style="display: flex; justify-content: space-between; margin-bottom: 10px;">
-                                <strong>${escapeHtml(comment.username)}</strong>
-                                <small style="color: #666;">
-                                    ${new Date(
-                                      comment.created_at
-                                    ).toLocaleDateString("ru-RU")}
-                                    ${new Date(
-                                      comment.created_at
-                                    ).toLocaleTimeString("ru-RU", {
-                                      hour: "2-digit",
-                                      minute: "2-digit",
-                                    })}
-                                </small>
-                            </div>
-                            <div>${escapeHtml(comment.comment)}</div>
-                        </div>
-                    `
-                      )
-                      .join("")}
+        <div class="comments-list">
+          ${comments
+            .map(
+              (comment) => `
+              <div class="comment">
+                <div class="comment-header">
+                  <span class="comment-author">${escapeHtml(
+                    comment.username
+                  )}</span>
+                  <span class="comment-date">
+                    ${new Date(comment.created_at).toLocaleDateString("ru-RU")}
+                    ${new Date(comment.created_at).toLocaleTimeString("ru-RU", {
+                      hour: "2-digit",
+                      minute: "2-digit",
+                    })}
+                  </span>
                 </div>
-            `;
+                <div class="comment-text">${escapeHtml(comment.comment)}</div>
+              </div>
+            `
+            )
+            .join("")}
+        </div>
+      `;
     }
 
     // Добавляем форму
     html += getCommentFormHTML();
+    html += `</div>`;
 
     container.innerHTML = html;
 
@@ -199,26 +204,21 @@ function getCommentFormHTML() {
   const savedName = getUsername();
 
   return `
-        <div class="comment-form" style="background: #f5f5f5; padding: 20px; border-radius: 10px; margin: 20px 0;">
-            <div id="comment-error" style="background: #f8d7da; color: #721c24; padding: 10px; border-radius: 5px; margin: 10px 0; display: none;"></div>
-            <div id="comment-success" style="background: #d4edda; color: #155724; padding: 10px; border-radius: 5px; margin: 10px 0; display: none;"></div>
-            
-            <h3>Добавить комментарий</h3>
-            <input type="text" id="comment-name" placeholder="Ваше имя" required 
-                   value="${escapeHtml(savedName)}"
-                   style="width: 100%; padding: 10px; margin: 5px 0; border: 1px solid #ddd; border-radius: 5px;">
-            <textarea id="comment-text" placeholder="Ваш комментарий..." rows="4" required
-                      style="width: 100%; padding: 10px; margin: 5px 0; border: 1px solid #ddd; border-radius: 5px;"></textarea>
-            <button id="submit-comment" 
-                    style="background: #4a90e2; color: white; padding: 12px 24px; border: none; border-radius: 5px; cursor: pointer;">
-                Отправить комментарий
-            </button>
-            <div style="margin-top: 10px; font-size: 0.9em; color: #666;">
-                <p>✓ Имя сохранится автоматически</p>
-                <p>✓ Можно использовать Ctrl+Enter для отправки</p>
-            </div>
-        </div>
-    `;
+    <div class="comment-form">
+      <div id="comment-error" class="error-message" style="display: none;"></div>
+      <div id="comment-success" class="success-message" style="display: none;"></div>
+      
+      <h4>Добавить комментарий</h4>
+      <input type="text" id="comment-name" placeholder="Ваше имя" required 
+             value="${escapeHtml(savedName)}">
+      <textarea id="comment-text" placeholder="Ваш комментарий..." rows="3" required></textarea>
+      <button id="submit-comment">Отправить комментарий</button>
+      <div class="form-hints">
+        <p>✓ Имя сохранится автоматически</p>
+        <p>✓ Можно использовать Ctrl+Enter для отправки</p>
+      </div>
+    </div>
+  `;
 }
 
 function bindCommentForm(container) {
@@ -360,10 +360,15 @@ document.addEventListener("DOMContentLoaded", function () {
   }, 10000);
 });
 
-// Экспорт функций для отладки
+// Экспорт функций для интеграции с app.js
 window.commentSystem = {
   init: initSupabase,
   loadComments: loadComments,
   setAudio: setCurrentAudio,
   getUsername: getUsername,
+  updateCurrentAudio: updateCurrentAudio,
 };
+
+// Экспорт для вызова из app.js
+window.updateCurrentAudio = updateCurrentAudio;
+window.initSupabase = initSupabase;

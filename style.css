@@ -53,6 +53,63 @@ h3 {
   border-color: #4a90e2;
 }
 
+/* Стили для отображения длительности аудио */
+.audio-item-content {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+}
+
+.audio-name {
+  flex-grow: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  margin-right: 10px;
+}
+
+.audio-duration {
+  font-size: 0.85em;
+  color: #666;
+  background: #f5f5f5;
+  padding: 2px 8px;
+  border-radius: 12px;
+  font-family: "Courier New", monospace;
+  font-weight: 500;
+  min-width: 45px;
+  text-align: center;
+  flex-shrink: 0;
+  transition: all 0.2s ease;
+}
+
+.audio-duration.unknown {
+  opacity: 0.5;
+}
+
+.audio-item:hover .audio-duration {
+  background: #e0e0e0;
+  color: #333;
+}
+
+.audio-item.active .audio-duration {
+  background: #4a6fa5;
+  color: white;
+}
+
+/* Для мобильных устройств */
+@media (max-width: 768px) {
+  .audio-duration {
+    font-size: 0.8em;
+    padding: 1px 6px;
+    min-width: 40px;
+  }
+
+  .audio-name {
+    margin-right: 5px;
+  }
+}
+
 .clear-search {
   position: absolute;
   right: 15px;
@@ -604,6 +661,201 @@ mark {
 
   .comments-accordion-toggle:hover {
     background: #3d3d3d;
+  }
+}
+/* СТИЛИ ДЛЯ КОММЕНТАРИЕВ (ДОБАВИТЬ В КОНЕЦ style.css) */
+
+/* Комментарии на десктопе (правая панель) */
+.comments-desktop {
+  background: #f9f9f9;
+  padding: 20px;
+  border-radius: 12px;
+  border: 1px solid #e0e0e0;
+}
+
+.comments-desktop h3 {
+  margin-top: 0;
+}
+
+/* Мобильный аккордеон для комментариев */
+.comments-mobile {
+  margin-top: 20px;
+}
+
+.comments-accordion-toggle {
+  width: 100%;
+  padding: 15px;
+  background: #4a90e2;
+  color: white;
+  border: none;
+  border-radius: 8px;
+  font-size: 16px;
+  font-weight: 500;
+  cursor: pointer;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.comments-accordion-toggle:hover {
+  background: #357abd;
+}
+
+.comments-accordion-content {
+  max-height: 0;
+  overflow: hidden;
+  transition: max-height 0.3s ease-out;
+  background: #f9f9f9;
+  border-radius: 0 0 8px 8px;
+}
+
+.comments-accordion-content.expanded {
+  max-height: 500px;
+  padding: 15px;
+  border: 1px solid #e0e0e0;
+  border-top: none;
+}
+
+/* Форма комментариев */
+.comment-form {
+  margin-bottom: 20px;
+}
+
+.comment-form h4 {
+  margin: 0 0 15px 0;
+  color: #2c3e50;
+}
+
+.comment-form input,
+.comment-form textarea {
+  width: 100%;
+  padding: 10px;
+  margin: 5px 0;
+  border: 1px solid #ddd;
+  border-radius: 5px;
+  font-family: "Segoe UI", system-ui, sans-serif;
+  font-size: 14px;
+}
+
+.comment-form textarea {
+  min-height: 80px;
+  resize: vertical;
+}
+
+.comment-form button {
+  background: #4a90e2;
+  color: white;
+  padding: 10px 20px;
+  border: none;
+  border-radius: 5px;
+  cursor: pointer;
+  font-size: 15px;
+  font-weight: 500;
+  margin-top: 10px;
+  width: 100%;
+}
+
+.comment-form button:hover {
+  background: #357abd;
+}
+
+/* Список комментариев */
+.comments-list {
+  max-height: 400px;
+  overflow-y: auto;
+}
+
+.comment {
+  border: 1px solid #eee;
+  padding: 12px;
+  margin: 10px 0;
+  border-radius: 5px;
+  background: white;
+}
+
+.comment-header {
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: 8px;
+  font-size: 14px;
+}
+
+.comment-author {
+  font-weight: bold;
+  color: #333;
+}
+
+.comment-date {
+  color: #666;
+}
+
+.comment-text {
+  line-height: 1.5;
+  font-size: 15px;
+}
+
+.no-comments {
+  text-align: center;
+  color: #666;
+  font-style: italic;
+  padding: 20px;
+}
+
+/* Для десктопа */
+@media (min-width: 768px) {
+  .comments-desktop {
+    display: block;
+    width: 300px;
+    flex-shrink: 0;
+    position: sticky;
+    top: 20px;
+    align-self: flex-start;
+    max-height: calc(100vh - 100px);
+    overflow-y: auto;
+  }
+
+  .comments-mobile {
+    display: none;
+  }
+}
+
+/* Для мобильных */
+@media (max-width: 767px) {
+  .comments-desktop {
+    display: none;
+  }
+
+  .comments-mobile {
+    display: block;
+  }
+}
+
+/* Темная тема для комментариев */
+@media (prefers-color-scheme: dark) {
+  .comments-desktop,
+  .comments-accordion-content {
+    background: #2d2d2d;
+    border-color: #444;
+  }
+
+  .comment {
+    background: #3d3d3d;
+    border-color: #444;
+  }
+
+  .comment-form input,
+  .comment-form textarea {
+    background: #3d3d3d;
+    color: #e0e0e0;
+    border-color: #555;
+  }
+
+  .comments-accordion-toggle {
+    background: #2c5282;
+  }
+
+  .comments-accordion-toggle:hover {
+    background: #1a3d6b;
   }
 }
 
