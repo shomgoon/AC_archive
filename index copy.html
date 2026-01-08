@@ -1,0 +1,87 @@
+<!DOCTYPE html>
+<html lang="ru">
+  <head>
+    <meta charset="UTF-8" />
+    <title>🎧Аудиоархив АС</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <link rel="stylesheet" href="style.css" />
+  </head>
+
+  <body>
+    <h1>🎧Аудиоархив АС</h1>
+
+    <!-- Поле поиска -->
+    <div class="search-container">
+      <input
+        type="text"
+        id="searchInput"
+        placeholder="🔍 Поиск по транскриптам..."
+        autocomplete="off"
+      />
+      <button class="clear-search" title="Очистить поиск">×</button>
+    </div>
+
+    <!-- Кнопка мобильного меню -->
+    <button class="mobile-menu-toggle" id="mobileMenuToggle">
+      <span>☰</span> Список аудиозаписей
+    </button>
+
+    <!-- Основной контейнер -->
+    <div class="container">
+      <!-- Левая панель со списком аудио -->
+      <div class="sidebar" id="sidebar">
+        <h3>🔊 Аудио</h3>
+        <div id="audioList">
+          <p class="warn">Загрузка списка...</p>
+        </div>
+      </div>
+
+      <!-- Центральная часть: плеер, транскрипт и комментарии (мобильные) -->
+      <div class="main">
+        <!-- Обертка для центральной и правой колонки -->
+        <div class="main-content-wrapper">
+          <!-- Транскрипт и плеер -->
+          <div class="transcript-container">
+            <div id="player"></div>
+            <div id="status" class="warn">Выберите запись из списка</div>
+            <div id="transcript"></div>
+
+            <!-- Комментарии на мобильных (аккордеон) -->
+            <div class="comments-mobile">
+              <button
+                class="comments-accordion-toggle"
+                id="mobileCommentsToggle"
+              >
+                <span>💬 Комментарии</span>
+                <span class="icon">▼</span>
+              </button>
+              <div
+                class="comments-accordion-content"
+                id="mobileCommentsContent"
+              >
+                <!-- Вставка комментариев сюда -->
+                <div id="comments-section-mobile"></div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Комментарии на десктопе (правая панель) -->
+          <div class="comments-desktop" id="comments-desktop">
+            <!-- Вставка комментариев сюда -->
+            <div id="comments-section-desktop"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <!-- Управление кэшем -->
+    <div class="cache-controls">
+      <button onclick="showCacheInfo()">📊 Статистика кэша</button>
+      <button onclick="clearCache()">🗑️ Очистить кэш</button>
+    </div>
+
+    <!-- Подключение скриптов -->
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.39.7"></script>
+    <script src="app.js"></script>
+    <script src="comments.js"></script>
+  </body>
+</html>
