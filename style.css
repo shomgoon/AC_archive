@@ -209,6 +209,13 @@ h3 {
 /* 8. АУДИОПЛЕЕР */
 #player {
   margin-bottom: 20px;
+  position: sticky;
+  top: 0;
+  z-index: 100;
+  background: #fafafa;
+  padding: 10px 0;
+  margin-top: -10px;
+  padding-top: 10px;
 }
 
 #player audio {
@@ -624,6 +631,10 @@ mark {
 
   .segment:hover {
     background: #3d3d3d;
+  }
+
+  #player {
+    background: #121212;
   }
 
   #searchInput {
