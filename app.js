@@ -310,10 +310,23 @@ async function loadRecording(audioFilename) {
       );
       updateCacheIcons();
     } else {
+      // Показываем прогресс загрузки транскрипта
+      setStatus(
+        `<span class="loading-indicator"></span> Загрузка транскрипта: ${baseName.replace(/_/g, " ")}...`,
+        "warn"
+      );
+      
       const transcriptData = await loadTranscriptFile(baseName);
 
       if (transcriptData) {
-        segments = parseTranscript(transcriptData.text);
+        // Показываем прогресс парсинга
+        setStatus(
+          `<span class="loading-indicator"></span> Обработка транскрипта: ${baseName.replace(/_/g, " ")}...`,
+          "warn"
+        );
+        
+        // Парсим транскрипт асинхронно, чтобы не блокировать UI
+        segments = await parseTranscriptAsync(transcriptData.text);
         transcriptCache.set(baseName, segments);
         console.log("Сохранено в кэш:", baseName);
 
@@ -353,26 +366,56 @@ async function loadRecording(audioFilename) {
   }
 }
 
-// === 3. ЗАГРУЗКА ФАЙЛА ТРАНСКРИПТА ===
+// === 3. ЗАГРУЗКА ФАЙЛА ТРАНСКРИПТА (ОПТИМИЗИРОВАННАЯ) ===
 async function loadTranscriptFile(baseName) {
   const extensions = [".md", ".txt"];
   const nameVariants = [baseName, baseName.replace(/_/g, " ")];
 
+  // Создаем массив всех возможных URL для параллельной проверки
+  const urls = [];
   for (const name of nameVariants) {
     for (const ext of extensions) {
-      const url = `${TRANSCRIPT_DIR}${name}${ext}`;
-      try {
-        const response = await fetch(url);
-        if (response.ok) {
-          return { text: await response.text(), ext };
-        }
-      } catch (e) {}
+      urls.push({ url: `${TRANSCRIPT_DIR}${name}${ext}`, ext });
     }
   }
+
+  // Параллельно проверяем все варианты файлов
+  const promises = urls.map(async ({ url, ext }) => {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 30000); // 30 секунд максимум
+    
+    try {
+      const response = await fetch(url, { 
+        cache: "no-cache",
+        signal: controller.signal
+      });
+      clearTimeout(timeoutId);
+      
+      if (response.ok) {
+        const text = await response.text();
+        return { text, ext, url };
+      }
+    } catch (e) {
+      clearTimeout(timeoutId);
+      // Игнорируем ошибки (таймаут, 404 и т.д.), пробуем следующий вариант
+    }
+    return null;
+  });
+
+  // Ждем результаты всех проверок
+  const results = await Promise.allSettled(promises);
+  
+  // Находим первый успешный результат
+  for (const result of results) {
+    if (result.status === "fulfilled" && result.value) {
+      return result.value;
+    }
+  }
+
   return null;
 }
 
-// === 4. ПАРСИНГ ТРАНСКРИПТА ===
+// === 4. ПАРСИНГ ТРАНСКРИПТА (СИНХРОННАЯ ВЕРСИЯ) ===
 function parseTranscript(text) {
   const startIndex = text.indexOf("### [");
   if (startIndex !== -1) text = text.slice(startIndex);
@@ -410,6 +453,25 @@ function parseTranscript(text) {
       return { start, end, title, text };
     })
     .filter(Boolean);
+}
+
+// === 4a. АСИНХРОННЫЙ ПАРСИНГ ТРАНСКРИПТА (для больших файлов) ===
+async function parseTranscriptAsync(text) {
+  return new Promise((resolve) => {
+    // Используем requestIdleCallback или setTimeout для неблокирующего парсинга
+    const parse = () => {
+      const result = parseTranscript(text);
+      resolve(result);
+    };
+
+    // Если доступен requestIdleCallback, используем его
+    if (window.requestIdleCallback) {
+      requestIdleCallback(parse, { timeout: 1000 });
+    } else {
+      // Иначе используем setTimeout с минимальной задержкой
+      setTimeout(parse, 0);
+    }
+  });
 }
 
 // === 5. ВОСПРОИЗВЕДЕНИЕ СЕГМЕНТА ===
