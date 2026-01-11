@@ -142,7 +142,7 @@ async function loadAudioList() {
           const formattedDuration = formatDuration(duration);
           durationHtml = `<span class="audio-duration" title="Длительность: ${formattedDuration}">${formattedDuration}</span>`;
         } else {
-          durationHtml = `<span class="audio-duration unknown" title="Длительность недоступна">--:--</span>`;
+          durationHtml = `<span class="audio-duration unknown" title="Длительность недоступна">--:--:--</span>`;
         }
 
         return `<div class="audio-item" data-filename="${file}" 
@@ -212,10 +212,18 @@ async function getAudioDuration(audioUrl) {
 
 // ========== НОВАЯ ФУНКЦИЯ: Форматирование длительности ==========
 function formatDuration(seconds) {
-  if (!seconds || seconds === 0) return "0:00";
-  const mins = Math.floor(seconds / 60);
+  // Убеждаемся, что seconds - это число
+  seconds = Number(seconds);
+  if (!seconds || seconds === 0 || isNaN(seconds)) return "0:00:00";
+  
+  const hours = Math.floor(seconds / 3600);
+  const minutes = Math.floor((seconds % 3600) / 60);
   const secs = Math.floor(seconds % 60);
-  return `${mins}:${secs.toString().padStart(2, "0")}`;
+  
+  const pad = (num) => num.toString().padStart(2, "0");
+  
+  // Всегда возвращаем формат часы:минуты:секунды
+  return `${pad(hours)}:${pad(minutes)}:${pad(secs)}`;
 }
 
 // === 2. ЗАГРУЗКА АУДИОЗАПИСИ ===
