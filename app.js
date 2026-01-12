@@ -11,6 +11,9 @@ const transcriptCache = new Map();
 const audioCache = new Map();
 const loadingState = new Map();
 
+// === ИНДЕКС ЗАГОЛОВКОВ ===
+let headerIndex = []; // Массив {audioFile, baseName, title, start, segmentIndex}
+
 // === 1. ЗАГРУЗКА СПИСКА АУДИО (ОБНОВЛЕННАЯ) ===
 // === 1. ЗАГРУЗКА СПИСКА АУДИО (ОБНОВЛЕННАЯ) ===
 async function loadAudioList() {
@@ -310,23 +313,10 @@ async function loadRecording(audioFilename) {
       );
       updateCacheIcons();
     } else {
-      // Показываем прогресс загрузки транскрипта
-      setStatus(
-        `<span class="loading-indicator"></span> Загрузка транскрипта: ${baseName.replace(/_/g, " ")}...`,
-        "warn"
-      );
-      
       const transcriptData = await loadTranscriptFile(baseName);
 
       if (transcriptData) {
-        // Показываем прогресс парсинга
-        setStatus(
-          `<span class="loading-indicator"></span> Обработка транскрипта: ${baseName.replace(/_/g, " ")}...`,
-          "warn"
-        );
-        
-        // Парсим транскрипт асинхронно, чтобы не блокировать UI
-        segments = await parseTranscriptAsync(transcriptData.text);
+        segments = parseTranscript(transcriptData.text);
         transcriptCache.set(baseName, segments);
         console.log("Сохранено в кэш:", baseName);
 
@@ -366,56 +356,26 @@ async function loadRecording(audioFilename) {
   }
 }
 
-// === 3. ЗАГРУЗКА ФАЙЛА ТРАНСКРИПТА (ОПТИМИЗИРОВАННАЯ) ===
+// === 3. ЗАГРУЗКА ФАЙЛА ТРАНСКРИПТА ===
 async function loadTranscriptFile(baseName) {
   const extensions = [".md", ".txt"];
   const nameVariants = [baseName, baseName.replace(/_/g, " ")];
 
-  // Создаем массив всех возможных URL для параллельной проверки
-  const urls = [];
   for (const name of nameVariants) {
     for (const ext of extensions) {
-      urls.push({ url: `${TRANSCRIPT_DIR}${name}${ext}`, ext });
+      const url = `${TRANSCRIPT_DIR}${name}${ext}`;
+      try {
+        const response = await fetch(url);
+        if (response.ok) {
+          return { text: await response.text(), ext };
+        }
+      } catch (e) {}
     }
   }
-
-  // Параллельно проверяем все варианты файлов
-  const promises = urls.map(async ({ url, ext }) => {
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 30000); // 30 секунд максимум
-    
-    try {
-      const response = await fetch(url, { 
-        cache: "no-cache",
-        signal: controller.signal
-      });
-      clearTimeout(timeoutId);
-      
-      if (response.ok) {
-        const text = await response.text();
-        return { text, ext, url };
-      }
-    } catch (e) {
-      clearTimeout(timeoutId);
-      // Игнорируем ошибки (таймаут, 404 и т.д.), пробуем следующий вариант
-    }
-    return null;
-  });
-
-  // Ждем результаты всех проверок
-  const results = await Promise.allSettled(promises);
-  
-  // Находим первый успешный результат
-  for (const result of results) {
-    if (result.status === "fulfilled" && result.value) {
-      return result.value;
-    }
-  }
-
   return null;
 }
 
-// === 4. ПАРСИНГ ТРАНСКРИПТА (СИНХРОННАЯ ВЕРСИЯ) ===
+// === 4. ПАРСИНГ ТРАНСКРИПТА ===
 function parseTranscript(text) {
   const startIndex = text.indexOf("### [");
   if (startIndex !== -1) text = text.slice(startIndex);
@@ -453,25 +413,6 @@ function parseTranscript(text) {
       return { start, end, title, text };
     })
     .filter(Boolean);
-}
-
-// === 4a. АСИНХРОННЫЙ ПАРСИНГ ТРАНСКРИПТА (для больших файлов) ===
-async function parseTranscriptAsync(text) {
-  return new Promise((resolve) => {
-    // Используем requestIdleCallback или setTimeout для неблокирующего парсинга
-    const parse = () => {
-      const result = parseTranscript(text);
-      resolve(result);
-    };
-
-    // Если доступен requestIdleCallback, используем его
-    if (window.requestIdleCallback) {
-      requestIdleCallback(parse, { timeout: 1000 });
-    } else {
-      // Иначе используем setTimeout с минимальной задержкой
-      setTimeout(parse, 0);
-    }
-  });
 }
 
 // === 5. ВОСПРОИЗВЕДЕНИЕ СЕГМЕНТА ===
@@ -546,7 +487,131 @@ function setStatus(message, type = "warn") {
   el.innerHTML = message;
 }
 
-// === 9. ПОИСК ПО ТРАНСКРИПТАМ ===
+// === 8.1. ПОСТРОЕНИЕ ИНДЕКСА ЗАГОЛОВКОВ ===
+async function buildHeaderIndex() {
+  setStatus("⏳ Построение индекса заголовков...", "warn");
+  
+  try {
+    // Получаем список аудиофайлов
+    let audioFiles = [];
+    try {
+      const response = await fetch("files.txt");
+      if (response.ok) {
+        const text = await response.text();
+        audioFiles = text
+          .split("\n")
+          .filter((line) => {
+            const trimmed = line.trim();
+            return trimmed && trimmed.match(/\.(mp3|wav|ogg)$/i);
+          })
+          .map((line) => line.trim());
+      }
+    } catch (e) {
+      console.log("⚠️ Ошибка загрузки files.txt:", e.message);
+    }
+
+    // Если не нашли файлов, используем стандартный список
+    if (audioFiles.length === 0) {
+      audioFiles = [
+        "и_понимаете_и_этому_всему_свои_этапы.mp3",
+        "он_пишет_дух_человека.mp3",
+        "подожди_батюшка_дай_я_включу.mp3",
+        "мои_дорогие_учимся_слушать_тишину.mp3",
+        "телевизор_включаешь_ли_смартфон.mp3",
+      ];
+    }
+
+    headerIndex = [];
+    
+    // Загружаем заголовки из всех транскриптов
+    const indexPromises = audioFiles.map(async (audioFile) => {
+      const baseName = audioFile.replace(/\.(mp3|wav|ogg)$/i, "");
+      const transcriptData = await loadTranscriptFile(baseName);
+      
+      if (transcriptData) {
+        // Парсим только заголовки без полного текста
+        const headers = parseHeadersOnly(transcriptData.text);
+        headers.forEach((header, segmentIndex) => {
+          headerIndex.push({
+            audioFile,
+            baseName,
+            title: header.title,
+            start: header.start,
+            segmentIndex
+          });
+        });
+      }
+    });
+
+    await Promise.all(indexPromises);
+    
+    console.log(`✅ Индекс построен: ${headerIndex.length} заголовков из ${audioFiles.length} файлов`);
+    setStatus(`✅ Индекс готов: ${headerIndex.length} заголовков`, "success");
+  } catch (err) {
+    console.error("❌ Ошибка построения индекса:", err);
+    setStatus("⚠️ Ошибка построения индекса", "error");
+  }
+}
+
+// === 8.2. ПАРСИНГ ТОЛЬКО ЗАГОЛОВКОВ (без текста) ===
+function parseHeadersOnly(text) {
+  const startIndex = text.indexOf("### [");
+  if (startIndex !== -1) text = text.slice(startIndex);
+
+  const rawSegments = text.split(/^(?=### \[)/m).filter(Boolean);
+
+  return rawSegments
+    .map((seg) => {
+      const headerMatch = seg.match(
+        /^### \[(\d{1,2}):(\d{2}):(\d{2})\]\s*(.*)/
+      );
+      if (!headerMatch) return null;
+
+      const h = parseInt(headerMatch[1]) || 0;
+      const m = parseInt(headerMatch[2]) || 0;
+      const s = parseInt(headerMatch[3]) || 0;
+      const title = headerMatch[4] || "";
+      const start = h * 3600 + m * 60 + s;
+
+      return { start, title };
+    })
+    .filter(Boolean);
+}
+
+// === 8.3. ПЕРЕХОД К СЕГМЕНТУ ИЗ РЕЗУЛЬТАТОВ ПОИСКА ===
+async function navigateToSegment(audioFile, segmentIndex) {
+  try {
+    // Загружаем аудио и транскрипт если они еще не загружены
+    const baseName = audioFile.replace(/\.(mp3|wav|ogg)$/i, "");
+    
+    if (currentAudio !== baseName) {
+      setStatus("⏳ Загрузка транскрипта...", "warn");
+      await loadRecording(audioFile);
+    }
+    
+    // Ждем, пока транскрипт загрузится (проверяем несколько раз)
+    let attempts = 0;
+    while (segments.length === 0 && attempts < 20) {
+      await new Promise(resolve => setTimeout(resolve, 100));
+      attempts++;
+    }
+    
+    // Переходим к нужному сегменту
+    if (segments.length > segmentIndex && segmentIndex >= 0) {
+      playSegment(segmentIndex);
+      // Показываем полный транскрипт после перехода
+      renderTranscript();
+      setStatus(`✅ Переход к сегменту: ${segments[segmentIndex].title}`, "success");
+    } else {
+      setStatus(`⚠️ Сегмент не найден (индекс: ${segmentIndex})`, "warn");
+    }
+  } catch (err) {
+    console.error("Ошибка перехода к сегменту:", err);
+    setStatus(`❌ Ошибка: ${err.message}`, "error");
+  }
+}
+
+// === 9. ПОИСК ПО ИНДЕКСУ ЗАГОЛОВКОВ ===
 function setupSearch() {
   const searchInput = document.getElementById("searchInput");
   const clearButton = document.querySelector(".clear-search");
@@ -557,50 +622,54 @@ function setupSearch() {
     const searchTerm = this.value.trim().toLowerCase();
 
     if (searchTerm === "") {
-      renderTranscript();
-      setStatus(`Показаны все ${segments.length} сегментов`, "success");
+      // Если транскрипт загружен, показываем его, иначе очищаем
+      if (segments.length > 0) {
+        renderTranscript();
+        setStatus(`Показаны все ${segments.length} сегментов`, "success");
+      } else {
+        const transcriptEl = document.getElementById("transcript");
+        transcriptEl.innerHTML = "";
+        setStatus("Выберите запись из списка", "warn");
+      }
       return;
     }
 
-    const filteredSegments = segments.filter(
-      (seg) =>
-        seg.title.toLowerCase().includes(searchTerm) ||
-        seg.text.toLowerCase().includes(searchTerm)
+    // Поиск по индексу заголовков
+    const filteredHeaders = headerIndex.filter((item) =>
+      item.title.toLowerCase().includes(searchTerm)
     );
 
     const transcriptEl = document.getElementById("transcript");
 
-    if (filteredSegments.length > 0) {
-      transcriptEl.innerHTML = filteredSegments
-        .map((seg, i) => {
-          const originalIndex = segments.indexOf(seg);
-          const highlight = (text) =>
-            text
-              ? text.replace(
-                  new RegExp(`(${searchTerm})`, "gi"),
-                  "<mark>$1</mark>"
-                )
-              : "";
+    if (filteredHeaders.length > 0) {
+      const highlight = (text) =>
+        text
+          ? text.replace(
+              new RegExp(`(${searchTerm})`, "gi"),
+              "<mark>$1</mark>"
+            )
+          : "";
 
-          return `<div class="segment" onclick="playSegment(${originalIndex})">
+      transcriptEl.innerHTML = filteredHeaders
+        .map((item) => {
+          const audioDisplayName = item.baseName.replace(/_/g, " ");
+          const timeFormatted = formatTime(item.start);
+          
+          return `<div class="segment search-result" 
+                      onclick="navigateToSegment('${item.audioFile}', ${item.segmentIndex})"
+                      style="cursor: pointer;">
                       <div>
-                        <span class="timestamp">[${formatTime(
-                          seg.start
-                        )}]</span>
-                        <strong>${highlight(seg.title)}</strong>
+                        <div style="font-size: 0.85em; color: #666; margin-bottom: 4px;">
+                          📁 ${audioDisplayName}
+                        </div>
+                        <span class="timestamp">[${timeFormatted}]</span>
+                        <strong>${highlight(item.title)}</strong>
                       </div>
-                      ${
-                        seg.text
-                          ? `<div style="margin-top:8px;font-size:0.95em;">${highlight(
-                              seg.text.replace(/\n/g, "<br>")
-                            )}</div>`
-                          : ""
-                      }
                     </div>`;
         })
         .join("");
 
-      setStatus(`🔍 Найдено ${filteredSegments.length} сегментов`, "success");
+      setStatus(`🔍 Найдено ${filteredHeaders.length} заголовков`, "success");
     } else {
       transcriptEl.innerHTML = `<p><i>По запросу "${searchTerm}" ничего не найдено</i></p>`;
       setStatus(`🔍 Ничего не найдено`, "warn");
@@ -610,8 +679,14 @@ function setupSearch() {
   if (clearButton) {
     clearButton.addEventListener("click", () => {
       searchInput.value = "";
-      renderTranscript();
-      setStatus(`Показаны все ${segments.length} сегментов`, "success");
+      if (segments.length > 0) {
+        renderTranscript();
+        setStatus(`Показаны все ${segments.length} сегментов`, "success");
+      } else {
+        const transcriptEl = document.getElementById("transcript");
+        transcriptEl.innerHTML = "";
+        setStatus("Выберите запись из списка", "warn");
+      }
     });
   }
 }
@@ -733,12 +808,14 @@ window.playSegment = playSegment;
 window.loadRecording = loadRecording;
 window.clearCache = clearCache;
 window.showCacheInfo = showCacheInfo;
+window.navigateToSegment = navigateToSegment;
 
 // === 16. ЗАПУСК ПРИЛОЖЕНИЯ ===
 document.addEventListener("DOMContentLoaded", () => {
   console.log("🚀 Запуск аудиоархива...");
 
   loadAudioList();
+  buildHeaderIndex(); // Строим индекс заголовков при загрузке
   setupSearch();
   setupMobileMenu();
   setupCommentsAccordion();

@@ -267,6 +267,15 @@ h3 {
   min-height: 60px; /* Для удобного касания */
 }
 
+.segment.search-result {
+  border-left-color: #ff9800;
+}
+
+.segment.search-result:hover {
+  background: #fff8e1;
+  border-left-color: #ff9800;
+}
+
 .segment:hover {
   background: #f8fcff;
   transform: translateY(-2px);
