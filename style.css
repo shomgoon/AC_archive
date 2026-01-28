@@ -267,15 +267,6 @@ h3 {
   min-height: 60px; /* Для удобного касания */
 }
 
-.segment.search-result {
-  border-left-color: #ff9800;
-}
-
-.segment.search-result:hover {
-  background: #fff8e1;
-  border-left-color: #ff9800;
-}
-
 .segment:hover {
   background: #f8fcff;
   transform: translateY(-2px);
@@ -511,7 +502,7 @@ mark {
 
   .sidebar {
     display: block; /* Всегда показываем */
-    width: 280px;
+    width: 350px;
     flex-shrink: 0;
     position: sticky;
     top: 20px;
@@ -576,7 +567,7 @@ mark {
 /* === ПЛАНШЕТЫ (от 1024px) === */
 @media (min-width: 1024px) {
   .sidebar {
-    width: 320px;
+    width: 400px;
   }
 
   .comments-desktop {
